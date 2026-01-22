@@ -23,8 +23,8 @@ A professional debugging extension and dashboard for Ultra-Wideband (UWB) device
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/uwb-dashboard.git
-    cd uwb-dashboard
+    git clone https://github.com/santpati/uwb-device-360.git
+    cd uwb-device-360
     ```
 
 2.  **Install dependencies:**
