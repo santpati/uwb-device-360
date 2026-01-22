@@ -15,7 +15,7 @@ I have built the initial version of the UWB Device Dashboard using **Next.js**.
 
 1.  **Navigate to the project**:
     ```bash
-    cd uwb-dashboard
+    cd uwb-device-360
     ```
 2.  **Install Dependencies** (if missing):
     ```bash
