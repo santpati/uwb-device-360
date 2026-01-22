@@ -1,11 +1,12 @@
 {
-  "name": "uwb-dashboard",
+  "name": "uwb-device-360",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "./node_modules/.bin/next dev",
     "build": "./node_modules/.bin/next build",
     "start": "./node_modules/.bin/next start",
+    "start:prod": "./node_modules/.bin/next start -p 8080",
     "lint": "./node_modules/.bin/eslint"
   },
   "dependencies": {
