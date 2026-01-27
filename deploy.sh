@@ -2,7 +2,7 @@
 
 # Configuration
 PEM_FILE="/Users/santpati/Desktop/Folders/AI/Santosh-Demo.pem"
-HOST="ec2-user@ec2-13-222-125-123.compute-1.amazonaws.com"
+HOST="ec2-user@ec2-100-53-121-117.compute-1.amazonaws.com"
 REMOTE_DIR="uwb-device-360"
 REPO_URL="https://github.com/santpati/uwb-device-360.git"
 
