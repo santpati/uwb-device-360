@@ -89,9 +89,20 @@ export default function TokenModal({ onSave, isOpen }: TokenModalProps) {
                             <Lock className="w-3 h-3" />
                             Sys Token <span className="text-red-500">*</span>
                             <div className="group relative ml-auto">
-                                <Info className="w-3 h-3 text-zinc-600 hover:text-indigo-400 cursor-help" />
-                                <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-800 text-zinc-300 text-[10px] p-3 rounded-xl border border-zinc-700 shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 leading-relaxed">
-                                    Open Developer Tools (F12) in your browser while on Cisco Spaces. Go to Network tab, filter for `sys-token`. Copy the value from the Cookie header.
+                                <Info className="w-4 h-4 text-zinc-500 hover:text-indigo-400 cursor-help transition-colors" />
+                                <div className="absolute right-0 top-full mt-2 w-[480px] bg-zinc-900 text-zinc-300 text-xs p-4 rounded-2xl border border-zinc-700 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed translate-y-2 group-hover:translate-y-0">
+                                    <div className="space-y-3">
+                                        <p className="font-medium text-indigo-400 uppercase tracking-wider text-[10px]">How to find your Sys-Token</p>
+                                        <ol className="list-decimal list-inside space-y-1 text-zinc-400">
+                                            <li>Open <span className="text-zinc-200">Developer Tools</span> (F12 or Right Click &gt; Inspect).</li>
+                                            <li>Go to the <span className="text-zinc-200">Application</span> (or Storage) tab.</li>
+                                            <li>Expand <span className="text-zinc-200">Cookies</span> &gt; <span className="text-zinc-200">https://dnaspaces.io</span>.</li>
+                                            <li>Locate <span className="text-indigo-300 font-mono">sys-token</span> and copy its value.</li>
+                                        </ol>
+                                        <div className="rounded-lg overflow-hidden border border-zinc-800">
+                                            <img src="/sys-token-guide.png" alt="Visual Guide" className="w-full h-auto object-cover opacity-90" />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </label>
