@@ -1,14 +1,16 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getAnalyticsStats } from '@/lib/db';
+import { getAnalyticsStats, getRecentEvents } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
     try {
         const { trends, ...stats } = getAnalyticsStats();
+        const auditLog = getRecentEvents();
 
         return NextResponse.json({
             stats,
-            trends
+            trends,
+            auditLog
         });
     } catch (e: any) {
         console.error('Stats error:', e);

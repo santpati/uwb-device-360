@@ -70,3 +70,12 @@ export function getAnalyticsStats() {
         trends
     };
 }
+
+export function getRecentEvents() {
+    return db.prepare(`
+        SELECT id, timestamp, event_type, sso_user, tenant_id, details 
+        FROM events 
+        ORDER BY timestamp DESC 
+        LIMIT 50
+    `).all();
+}

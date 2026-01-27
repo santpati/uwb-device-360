@@ -30,9 +30,19 @@ interface TrendData {
     count: number;
 }
 
+interface AuditLogEntry {
+    id: number;
+    timestamp: string;
+    event_type: string;
+    sso_user: string;
+    tenant_id: string;
+    details: string;
+}
+
 export default function AnalyticsPage() {
     const [stats, setStats] = useState<AnalyticsStats | null>(null);
     const [trends, setTrends] = useState<TrendData[]>([]);
+    const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -42,6 +52,7 @@ export default function AnalyticsPage() {
                 if (data.stats) {
                     setStats(data.stats);
                     setTrends(data.trends || []);
+                    setAuditLog(data.auditLog || []);
                 }
             })
             .catch(err => console.error("Failed to load analytics", err))
@@ -119,7 +130,7 @@ export default function AnalyticsPage() {
                 </div>
 
                 {/* Charts */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
                     <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 min-h-[400px]">
                         <h3 className="text-zinc-300 font-medium mb-6 uppercase tracking-wider text-xs">Activity Trends (Last 7 Days)</h3>
                         <ResponsiveContainer width="100%" height={300}>
@@ -140,12 +151,74 @@ export default function AnalyticsPage() {
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
+                </div>
 
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 min-h-[400px]">
-                        <h3 className="text-zinc-300 font-medium mb-6 uppercase tracking-wider text-xs">Usage Composition</h3>
-                        <div className="flex h-full items-center justify-center text-zinc-600 italic">
-                            More detailed breakdown coming soon...
-                        </div>
+                {/* Audit Trail Table */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden">
+                    <div className="p-6 border-b border-zinc-800">
+                        <h3 className="text-zinc-300 font-medium uppercase tracking-wider text-xs">Audit Trail (Recent Sessions)</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-zinc-950/50 text-zinc-500 font-medium uppercase tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-4">Event ID</th>
+                                    <th className="px-6 py-4">Time</th>
+                                    <th className="px-6 py-4">User</th>
+                                    <th className="px-6 py-4">Tenant</th>
+                                    <th className="px-6 py-4">Event Type</th>
+                                    <th className="px-6 py-4">Details / Devices Viewed</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-800">
+                                {auditLog.map((log) => {
+                                    let detailsPretty = '-';
+                                    try {
+                                        if (log.details) {
+                                            const d = JSON.parse(log.details);
+                                            if (log.event_type === 'debug_device') {
+                                                detailsPretty = `Device: ${d.mac} (${d.model || 'Unknown'})`;
+                                            } else if (log.event_type === 'start_stream') {
+                                                detailsPretty = `Stream: ${d.mac}`;
+                                            } else {
+                                                detailsPretty = JSON.stringify(d);
+                                            }
+                                        }
+                                    } catch (e) {
+                                        detailsPretty = log.details;
+                                    }
+
+                                    return (
+                                        <tr key={log.id} className="hover:bg-zinc-800/20 transition-colors">
+                                            <td className="px-6 py-4 font-mono text-zinc-500">#{log.id}</td>
+                                            <td className="px-6 py-4 text-zinc-400 font-mono">
+                                                {new Date(log.timestamp).toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4 text-white font-medium">{log.sso_user}</td>
+                                            <td className="px-6 py-4 text-zinc-400 font-mono">{log.tenant_id}</td>
+                                            <td className="px-6 py-4">
+                                                <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${log.event_type === 'session_start' ? 'bg-blue-500/10 text-blue-400' :
+                                                        log.event_type === 'debug_device' ? 'bg-purple-500/10 text-purple-400' :
+                                                            'bg-orange-500/10 text-orange-400'
+                                                    }`}>
+                                                    {log.event_type.replace('_', ' ')}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-zinc-300 max-w-xs truncate">
+                                                {detailsPretty}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {auditLog.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center text-zinc-500 italic">
+                                            No events recorded yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
