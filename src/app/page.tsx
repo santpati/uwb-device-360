@@ -31,7 +31,7 @@ interface LocationInfo {
 }
 
 export default function Home() {
-  const [tokens, setTokens] = useState<{ sys: string; user: string; tenant: string; firehoseApiKey?: string } | null>(null);
+  const [tokens, setTokens] = useState<{ sys: string; user: string; tenant: string; firehoseApiKey?: string; ssoUser?: string; exp?: number } | null>(null);
   const [deviceMac, setDeviceMac] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
@@ -40,6 +40,29 @@ export default function Home() {
   const [locationData, setLocationData] = useState<LocationInfo | null>(null);
   const [showModal, setShowModal] = useState(true);
   const [claimedDevices, setClaimedDevices] = useState<any[]>([]);
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  // Token Expiration Countdown
+  useEffect(() => {
+    if (!tokens?.exp) return;
+
+    const interval = setInterval(() => {
+      const now = Math.floor(Date.now() / 1000);
+      const diff = tokens.exp! - now;
+
+      if (diff <= 0) {
+        setTimeLeft("Expired");
+        clearInterval(interval);
+      } else {
+        const hours = Math.floor(diff / 3600);
+        const minutes = Math.floor((diff % 3600) / 60);
+        const seconds = diff % 60;
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [tokens?.exp]);
 
   // Fetch Claimed Devices on Mount/Token Update
   useEffect(() => {
@@ -92,8 +115,8 @@ export default function Home() {
     });
   };
 
-  const handleTokenSave = (sys: string, user: string, tenant: string, firehoseApiKey: string) => {
-    setTokens({ sys, user, tenant, firehoseApiKey });
+  const handleTokenSave = (sys: string, user: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number) => {
+    setTokens({ sys, user, tenant, firehoseApiKey, ssoUser, exp });
     setShowModal(false);
   };
 
@@ -187,9 +210,22 @@ export default function Home() {
             </div>
             <h1 className="font-bold text-lg tracking-tight">UWB Debugger <span className="text-zinc-500 font-normal text-sm ml-2">Extension</span></h1>
           </div>
-          <button onClick={() => setShowModal(true)} className="text-xs font-mono text-zinc-500 hover:text-white transition-colors">
-            {tokens ? 'Configured' : 'No Token'}
-          </button>
+
+          <div className="flex items-center gap-6">
+            {tokens?.ssoUser && (
+              <div className="hidden md:flex flex-col items-end">
+                <span className="text-xs text-zinc-400">Hello, <span className="text-white font-medium">{tokens.ssoUser}</span></span>
+                {timeLeft && (
+                  <span className={`text-[10px] font-mono ${timeLeft === 'Expired' ? 'text-red-500' : 'text-emerald-500'}`}>
+                    Expires in: {timeLeft}
+                  </span>
+                )}
+              </div>
+            )}
+            <button onClick={() => setShowModal(true)} className="text-xs font-mono text-zinc-500 hover:text-white transition-colors">
+              {tokens ? 'Configured' : 'No Token'}
+            </button>
+          </div>
         </div>
       </header>
 
