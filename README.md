@@ -105,13 +105,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 This project is licensed under the MIT License.
-
-## 👨‍💻 About the Author
-
-**Santosh Patil**
-
-I build tools and dashboards designed to accelerate product and technology adoption, with a primary focus on **UWB (Ultra-Wideband)**, **WiFi 7**, and the broader **Cisco Spaces** ecosystem.
-
--   **Mission**: Simplifying complex location technologies through intuitive visualization and practical debugging tools.
--   **Connect**: [LinkedIn](https://www.linkedin.com/in/2santoshpatil/)
-
