@@ -47,9 +47,14 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
     npm run build
 
     # Start/Restart Application
-    echo "🚀 Restarting application..."
-    pm2 delete "uwb-device-360" 2> /dev/null || true
-    pm2 start npm --name "uwb-device-360" -- run start:prod
+    # Start/Restart Application
+    if pm2 show uwb-device-360 > /dev/null; then
+        echo "♻️  Reloading application (Cluster Mode)..."
+        pm2 reload ecosystem.config.js
+    else
+        echo "🚀 Starting application (Cluster Mode)..."
+        pm2 start ecosystem.config.js
+    fi
     
     # Start/Restart System Monitor
     echo "📊 Starting System Monitor..."
