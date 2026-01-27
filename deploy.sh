@@ -46,10 +46,17 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
     echo "🏗️  Building application..."
     npm run build
 
-    # Start/Restart
+    # Start/Restart Application
     echo "🚀 Restarting application..."
     pm2 delete "uwb-device-360" 2> /dev/null || true
     pm2 start npm --name "uwb-device-360" -- run start:prod
+    
+    # Start/Restart System Monitor
+    echo "📊 Starting System Monitor..."
+    chmod +x monitor_system.sh
+    pm2 delete "system-monitor" 2> /dev/null || true
+    pm2 start ./monitor_system.sh --name "system-monitor"
+
     pm2 save
 
     echo "✅ Application running on port 8080"
