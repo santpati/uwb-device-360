@@ -41,6 +41,41 @@ export default function Home() {
   const [showModal, setShowModal] = useState(true);
   const [claimedDevices, setClaimedDevices] = useState<any[]>([]);
   const [timeLeft, setTimeLeft] = useState<string>("");
+  const [totalDebugs, setTotalDebugs] = useState<number>(0);
+
+  // Fetch Analytics Stats
+  useEffect(() => {
+    fetch('/api/analytics/stats')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.stats?.totalDebugs) {
+          setTotalDebugs(data.stats.totalDebugs);
+        }
+      })
+      .catch(err => console.error("Failed to load stats", err));
+  }, []);
+
+  // Tracking Helper
+  const trackEvent = async (eventType: string, details?: any) => {
+    try {
+      await fetch('/api/analytics/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventType,
+          ssoUser: tokens?.ssoUser,
+          tenantId: tokens?.tenant,
+          details
+        })
+      });
+      // Refresh stats if debug event
+      if (eventType === 'debug_device') {
+        setTotalDebugs(prev => prev + 1);
+      }
+    } catch (e) {
+      console.error("Tracking failed", e);
+    }
+  };
 
   // Token Expiration Countdown
   useEffect(() => {
@@ -49,7 +84,7 @@ export default function Home() {
     const interval = setInterval(() => {
       const now = Math.floor(Date.now() / 1000);
       const diff = tokens.exp! - now;
-
+      // ... existing countdown logic ...
       if (diff <= 0) {
         setTimeLeft("Expired");
         clearInterval(interval);
@@ -66,6 +101,7 @@ export default function Home() {
 
   // Fetch Claimed Devices on Mount/Token Update
   useEffect(() => {
+    // ... existing fetchDevices logic ...
     const fetchDevices = async () => {
       if (!tokens?.sys) return;
 
@@ -118,6 +154,18 @@ export default function Home() {
   const handleTokenSave = (sys: string, user: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number) => {
     setTokens({ sys, user, tenant, firehoseApiKey, ssoUser, exp });
     setShowModal(false);
+
+    // Track Session Start
+    // We need to pass the values directly since state update is async/batched
+    fetch('/api/analytics/track', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventType: 'session_start',
+        ssoUser,
+        tenantId: tenant
+      })
+    }).catch(console.error);
   };
 
   const handleSearch = async () => {
@@ -141,6 +189,10 @@ export default function Home() {
           const device = found || found2;
           const actualMac = device.mac || device.macAddress;
           saveToHistory(actualMac);
+
+          // Track Debug Event
+          trackEvent('debug_device', { mac: actualMac, model: device.model });
+
           setDeviceData({
             macAddress: actualMac,
             name: device.name,
@@ -208,7 +260,18 @@ export default function Home() {
             <div className="w-8 h-8 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Activity className="w-5 h-5 text-white" />
             </div>
-            <h1 className="font-bold text-lg tracking-tight">UWB Debugger <span className="text-zinc-500 font-normal text-sm ml-2">Extension</span></h1>
+            <div>
+              <h1 className="font-bold text-lg tracking-tight flex items-center gap-2">
+                UWB Debugger
+                <span className="text-zinc-500 font-normal text-sm ml-2">Extension</span>
+              </h1>
+              {totalDebugs > 0 && (
+                <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/50 animate-pulse"></span>
+                  {totalDebugs.toLocaleString()} debugs performed
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-6">

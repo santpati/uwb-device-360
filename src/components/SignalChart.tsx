@@ -78,6 +78,16 @@ export default function SignalChart({ macAddress, apiKey }: SignalChartProps) {
         setError(null);
         setData([]);
 
+        // Track Stream Start
+        fetch('/api/analytics/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                eventType: 'start_stream',
+                details: { mac: macAddress }
+            })
+        }).catch(console.error);
+
         const controller = new AbortController();
         abortControllerRef.current = controller;
 
