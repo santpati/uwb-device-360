@@ -94,6 +94,7 @@ export default function TokenModal({ onSave, isOpen }: TokenModalProps) {
                                     <div className="space-y-3">
                                         <p className="font-medium text-indigo-400 uppercase tracking-wider text-[10px]">How to find your Sys-Token</p>
                                         <ol className="list-decimal list-inside space-y-1 text-zinc-400">
+                                            <li>Go to <a href="https://dnaspaces.io" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 hover:underline">dnaspaces.io</a> and login to your tenant.</li>
                                             <li>Open <span className="text-zinc-200">Developer Tools</span> (F12 or Right Click &gt; Inspect).</li>
                                             <li>Go to the <span className="text-zinc-200">Application</span> (or Storage) tab.</li>
                                             <li>Expand <span className="text-zinc-200">Cookies</span> &gt; <span className="text-zinc-200">https://dnaspaces.io</span>.</li>
