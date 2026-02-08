@@ -62,14 +62,19 @@ export function getAnalyticsStats() {
     `).all();
 
     const debugTrends = db.prepare(`
+        WITH daily_counts AS (
+            SELECT 
+                strftime('%Y-%m-%d', timestamp) as date,
+                COUNT(*) as daily_count
+            FROM events 
+            WHERE event_type = 'debug_device'
+            GROUP BY 1
+        )
         SELECT 
-            strftime('%Y-%m-%d', timestamp) as date,
-            COUNT(*) as count
-        FROM events 
-        WHERE event_type = 'debug_device'
-        AND timestamp >= date('now', '-30 days')
-        GROUP BY 1
-        ORDER BY 1 ASC
+            date,
+            SUM(daily_count) OVER (ORDER BY date) as count
+        FROM daily_counts
+        ORDER BY date ASC
     `).all();
 
     return {
