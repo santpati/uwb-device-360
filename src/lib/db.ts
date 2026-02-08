@@ -61,13 +61,25 @@ export function getAnalyticsStats() {
         ORDER BY 1 ASC
     `).all();
 
+    const debugTrends = db.prepare(`
+        SELECT 
+            strftime('%Y-%m-%d', timestamp) as date,
+            COUNT(*) as count
+        FROM events 
+        WHERE event_type = 'debug_device'
+        AND timestamp >= date('now', '-30 days')
+        GROUP BY 1
+        ORDER BY 1 ASC
+    `).all();
+
     return {
         totalUniqueUsers: totalUsers.count,
         totalTenants: totalTenants.count,
         totalSuccessfulSessions: successfulSessions.count,
         totalDebugs: totalDebugs.count,
         totalStreams: totalStreams.count,
-        trends
+        trends,
+        debugTrends
     };
 }
 

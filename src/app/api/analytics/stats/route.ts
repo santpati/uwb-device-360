@@ -4,12 +4,13 @@ import { getAnalyticsStats, getRecentEvents } from '@/lib/db';
 
 export async function GET(req: NextRequest) {
     try {
-        const { trends, ...stats } = getAnalyticsStats();
+        const { trends, debugTrends, ...stats } = getAnalyticsStats();
         const auditLog = getRecentEvents();
 
         return NextResponse.json({
             stats,
             trends,
+            debugTrends,
             auditLog
         });
     } catch (e: any) {

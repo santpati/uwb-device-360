@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Users, Globe, Play, Search, ArrowLeft } from "lucide-react";
 import Link from 'next/link';
+import DebugsChart from "@/components/DebugsChart";
 import {
     LineChart,
     Line,
@@ -30,6 +31,11 @@ interface TrendData {
     count: number;
 }
 
+interface DebugTrend {
+    date: string;
+    count: number;
+}
+
 interface AuditLogEntry {
     id: number;
     timestamp: string;
@@ -42,6 +48,7 @@ interface AuditLogEntry {
 export default function AnalyticsPage() {
     const [stats, setStats] = useState<AnalyticsStats | null>(null);
     const [trends, setTrends] = useState<TrendData[]>([]);
+    const [debugTrends, setDebugTrends] = useState<DebugTrend[]>([]);
     const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -52,6 +59,7 @@ export default function AnalyticsPage() {
                 if (data.stats) {
                     setStats(data.stats);
                     setTrends(data.trends || []);
+                    setDebugTrends(data.debugTrends || []);
                     setAuditLog(data.auditLog || []);
                 }
             })
@@ -129,6 +137,14 @@ export default function AnalyticsPage() {
                     />
                 </div>
 
+                {/* Debugs Trend Widget */}
+                {stats?.totalDebugs !== undefined && debugTrends.length > 0 && (
+                    <DebugsChart
+                        total={stats.totalDebugs}
+                        trends={debugTrends}
+                    />
+                )}
+
                 {/* Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
                     <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 min-h-[400px]">
@@ -198,8 +214,8 @@ export default function AnalyticsPage() {
                                             <td className="px-6 py-4 text-zinc-400 font-mono">{log.tenant_id}</td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-2 py-1 rounded text-[10px] uppercase font-bold ${log.event_type === 'session_start' ? 'bg-blue-500/10 text-blue-400' :
-                                                        log.event_type === 'debug_device' ? 'bg-purple-500/10 text-purple-400' :
-                                                            'bg-orange-500/10 text-orange-400'
+                                                    log.event_type === 'debug_device' ? 'bg-purple-500/10 text-purple-400' :
+                                                        'bg-orange-500/10 text-orange-400'
                                                     }`}>
                                                     {log.event_type.replace('_', ' ')}
                                                 </span>
