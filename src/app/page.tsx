@@ -30,15 +30,27 @@ interface LocationInfo {
   lastLocatedTime?: number;
 }
 
+import LandingPage from "@/components/LandingPage";
+
+interface Tokens {
+  sys: string;
+  user: string;
+  tenant: string;
+  firehoseApiKey?: string;
+  ssoUser?: string;
+  exp?: number;
+}
+
 export default function Home() {
-  const [tokens, setTokens] = useState<{ sys: string; user: string; tenant: string; firehoseApiKey?: string; ssoUser?: string; exp?: number } | null>(null);
+  const [tokens, setTokens] = useState<Tokens | null>(null);
+  const [showTokenModal, setShowTokenModal] = useState(false); // Used for "Edit" mode
   const [deviceMac, setDeviceMac] = useState("");
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [showRecent, setShowRecent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [deviceData, setDeviceData] = useState<DeviceInfo | null>(null);
   const [locationData, setLocationData] = useState<LocationInfo | null>(null);
-  const [showModal, setShowModal] = useState(true);
+  // Removed old showModal since we use local showTokenModal
   const [claimedDevices, setClaimedDevices] = useState<any[]>([]);
   const [timeLeft, setTimeLeft] = useState<string>("");
   const [totalDebugs, setTotalDebugs] = useState<number>(0);
@@ -151,12 +163,26 @@ export default function Home() {
     });
   };
 
-  const handleTokenSave = (sys: string, user: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number) => {
-    setTokens({ sys, user, tenant, firehoseApiKey, ssoUser, exp });
-    setShowModal(false);
+  const handleTokenSave = (sysToken: string, userAccessToken: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number) => {
+    // Map the incoming args to our state shape
+    setTokens({
+      sys: sysToken,
+      user: userAccessToken,
+      tenant,
+      firehoseApiKey,
+      ssoUser,
+      exp
+    });
+
+    setShowTokenModal(false);
+
+    // Store tokens in localStorage
+    localStorage.setItem("sys_token", sysToken);
+    localStorage.setItem("tenant_id", tenant);
+    if (firehoseApiKey) localStorage.setItem("firehose_api_key", firehoseApiKey);
+    if (userAccessToken) localStorage.setItem("user_token", userAccessToken);
 
     // Track Session Start
-    // We need to pass the values directly since state update is async/batched
     fetch('/api/analytics/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -167,6 +193,10 @@ export default function Home() {
       })
     }).catch(console.error);
   };
+
+  if (!tokens) {
+    return <LandingPage onSave={handleTokenSave} />;
+  }
 
   const handleSearch = async () => {
     if (!tokens || !deviceMac) return;
@@ -251,7 +281,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-indigo-500/30">
-      <TokenModal onSave={handleTokenSave} isOpen={showModal} />
+      {showTokenModal && (
+        <TokenModal
+          isOpen={true}
+          onSave={handleTokenSave}
+        />
+      )}
 
       {/* Header */}
       <header className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-30">
@@ -285,7 +320,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            <button onClick={() => setShowModal(true)} className="text-xs font-mono text-zinc-500 hover:text-white transition-colors">
+            <button onClick={() => setShowTokenModal(true)} className="text-xs font-mono text-zinc-500 hover:text-white transition-colors">
               {tokens ? 'Configured' : 'No Token'}
             </button>
           </div>
