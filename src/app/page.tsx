@@ -271,7 +271,7 @@ export default function Home() {
     } catch (e: any) {
       console.error(e);
       if (e.status === 401 || e.status === 403) {
-        setShowModal(true);
+        setShowTokenModal(true);
         alert("Session Expired. Please update your tokens.");
       }
     } finally {
