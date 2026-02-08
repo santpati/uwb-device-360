@@ -9,7 +9,10 @@ interface TokenModalProps {
 
 interface DecodedToken {
     tenantId: number | string;
-    ssoUser: string;
+    ssoUser?: string;
+    email?: string;
+    sub?: string;
+    username?: string;
     exp: number;
     [key: string]: any;
 }
@@ -64,7 +67,8 @@ export default function TokenModal({ onSave, isOpen }: TokenModalProps) {
                 localStorage.removeItem("firehose_api_key");
             }
 
-            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, decodedData.ssoUser, decodedData.exp);
+            const user = decodedData.ssoUser || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
+            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp);
         } else {
             setError("Invalid System Token. Could not extract Tenant ID.");
         }
@@ -130,7 +134,7 @@ export default function TokenModal({ onSave, isOpen }: TokenModalProps) {
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">User</span>
-                                    <span className="text-white font-mono text-sm truncate" title={decodedData.ssoUser}>{decodedData.ssoUser}</span>
+                                    <span className="text-white font-mono text-sm truncate" title={decodedData.ssoUser || decodedData.email || decodedData.sub || decodedData.username}>{decodedData.ssoUser || decodedData.email || decodedData.sub || decodedData.username || "Unknown"}</span>
                                 </div>
                                 <div className="col-span-2">
                                     <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">Expires</span>

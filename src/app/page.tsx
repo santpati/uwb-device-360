@@ -501,7 +501,7 @@ export default function Home() {
           {tokens?.firehoseApiKey ? (
             <div className="col-span-1 lg:col-span-3">
               {deviceData ? (
-                <SignalChart macAddress={deviceData.macAddress} apiKey={tokens.firehoseApiKey} />
+                <SignalChart macAddress={deviceData.macAddress} apiKey={tokens.firehoseApiKey} ssoUser={tokens.ssoUser} />
               ) : (
                 <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6">
                   <div className="flex items-center justify-between mb-6">

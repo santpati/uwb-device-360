@@ -33,9 +33,10 @@ interface EventLog {
 interface SignalChartProps {
     macAddress: string;
     apiKey: string;
+    ssoUser?: string;
 }
 
-export default function SignalChart({ macAddress, apiKey }: SignalChartProps) {
+export default function SignalChart({ macAddress, apiKey, ssoUser }: SignalChartProps) {
     const [data, setData] = useState<SignalPoint[]>([]);
     const [events, setEvents] = useState<EventLog[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
@@ -55,6 +56,7 @@ export default function SignalChart({ macAddress, apiKey }: SignalChartProps) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 eventType: 'start_stream',
+                ssoUser,
                 details: { mac: macAddress }
             })
         }).catch(console.error);
