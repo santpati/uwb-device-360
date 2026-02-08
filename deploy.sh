@@ -65,5 +65,5 @@ EOF
 
 echo "========================================"
 echo "🎉 Deployment Complete!"
-echo "Global Deployment URL: http://ec2-13-222-125-123.compute-1.amazonaws.com:8080"
+echo "Global Deployment URL: http://ec2-100-53-121-117.compute-1.amazonaws.com:8080"
 echo "========================================"

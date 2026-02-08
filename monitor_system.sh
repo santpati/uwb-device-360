@@ -13,11 +13,12 @@ while true; do
   # Free Memory (MB)
   FREE_MEM=$(free -m | grep Mem | awk '{print $4}')
   
-  # Node Process Stats (assuming process name contains 'next' or 'uwb')
+  # Node Process Stats (assuming process name contains 'next' or 'uwb' or 'node')
   # This grabs the top CPU consuming node process
-  NODE_STATS=$(ps -eo comm,pcpu,rss | grep node | sort -k2 -r | head -n 1)
-  NODE_CPU=$(echo $NODE_STATS | awk '{print $2}')
-  NODE_MEM_KB=$(echo $NODE_STATS | awk '{print $3}')
+  # Use pcpu,rss,comm to ensure we get stats first, as command name might have spaces
+  NODE_STATS=$(ps -eo pcpu,rss,comm | grep -E "node|next-server" | sort -k1 -r | head -n 1)
+  NODE_CPU=$(echo $NODE_STATS | awk '{print $1}')
+  NODE_MEM_KB=$(echo $NODE_STATS | awk '{print $2}')
   
   if [ -z "$NODE_MEM_KB" ]; then
     NODE_MEM_MB=0
