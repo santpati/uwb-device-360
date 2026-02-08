@@ -101,8 +101,23 @@ export default function LandingPage({ onSave }: LandingPageProps) {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 lg:p-8">
-            <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
+        <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 lg:p-8 relative overflow-hidden">
+
+            {/* Background Video */}
+            <div className="absolute inset-0 z-0">
+                <div className="absolute inset-0 bg-black/80 z-10"></div> {/* Overlay */}
+                <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover opacity-60"
+                >
+                    <source src="/3d-rotation.mp4" type="video/mp4" />
+                </video>
+            </div>
+
+            <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center relative z-10">
 
                 {/* Left Column: Configuration */}
                 {/* Validated Header Structure */}
@@ -110,18 +125,7 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                     <div>
                         <div className="flex flex-col gap-1 mb-8">
                             <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-full bg-black/50 border border-zinc-800 shadow-xl overflow-hidden relative flex-shrink-0">
-                                    <video
-                                        autoPlay
-                                        loop
-                                        muted
-                                        playsInline
-                                        className="w-full h-full object-cover scale-150"
-                                    >
-                                        <source src="/3d-rotation.mp4" type="video/mp4" />
-                                    </video>
-                                    <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-full md:hidden"></div>
-                                </div>
+                                <img src="/cisco-uwb-logo.png" alt="Cisco UWB" className="w-20 h-20 object-contain" />
                                 <div className="flex flex-col">
                                     <span className="text-white font-bold text-2xl tracking-tight">UWB 360 DASHBOARD</span>
                                     <span className="text-indigo-400 font-medium text-sm tracking-wide uppercase bg-indigo-500/10 px-2 py-0.5 rounded-md self-start border border-indigo-500/20">Cisco Internal Tool</span>
