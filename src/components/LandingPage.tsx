@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Lock, Radio, Info, Key, Play, Terminal, CheckCircle2 } from "lucide-react";
+import { Lock, Radio, Info, Key, Play, Terminal, CheckCircle2, Sparkles } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 
 interface LandingPageProps {
@@ -215,7 +215,42 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                 </div>
 
                 {/* Right Column: Video & Info */}
-                <div className="space-y-8 animate-in slide-in-from-right-4 duration-500 delay-100">
+                <div className="space-y-6 animate-in slide-in-from-right-4 duration-500 delay-100">
+
+                    {/* What's New Banner */}
+                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 backdrop-blur-md p-5 shadow-2xl">
+                        <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-indigo-500/20 rounded-full blur-2xl"></div>
+
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                                <Sparkles className="w-4 h-4 text-indigo-400" />
+                            </div>
+                            <h3 className="font-semibold text-white tracking-wide text-sm uppercase">What's New</h3>
+                            <span className="ml-auto text-[10px] font-medium px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full border border-indigo-500/20">Latest Updates</span>
+                        </div>
+
+                        <ul className="space-y-3">
+                            <li className="flex gap-3 text-zinc-300 text-xs leading-relaxed">
+                                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0 shadow-[0_0_8px_rgba(129,140,248,0.5)]"></div>
+                                <span>
+                                    <strong className="text-white">Multi-Device Debugging:</strong> Monitor and debug multiple UWB devices in parallel tabs.
+                                </span>
+                            </li>
+                            <li className="flex gap-3 text-zinc-300 text-xs leading-relaxed">
+                                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0 shadow-[0_0_8px_rgba(192,132,252,0.5)]"></div>
+                                <span>
+                                    <strong className="text-white">Cisco Live EU Ready:</strong> Simplified experience with auto-selected Firehose API keys.
+                                </span>
+                            </li>
+                            <li className="flex gap-3 text-zinc-300 text-xs leading-relaxed">
+                                <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.5)]"></div>
+                                <span>
+                                    <strong className="text-white">Make a Wish:</strong> Share your feedback and feature requests directly from the dashboard.
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+
                     <div className="relative group">
                         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
                         <div className="relative aspect-video rounded-xl bg-black overflow-hidden border border-zinc-800 shadow-2xl">
