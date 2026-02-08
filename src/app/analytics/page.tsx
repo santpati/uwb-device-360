@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Activity, Users, Globe, Play, Search, ArrowLeft } from "lucide-react";
+import { Activity, Users, Globe, Play, Search, ArrowLeft, Paperclip } from "lucide-react";
 import Link from 'next/link';
 import DebugsChart from "@/components/DebugsChart";
 import {
@@ -45,11 +45,22 @@ interface AuditLogEntry {
     details: string;
 }
 
+interface FeedbackItem {
+    id: number;
+    timestamp: string;
+    feedback: string;
+    name?: string;
+    email?: string;
+    sso_user?: string;
+    image_path?: string;
+}
+
 export default function AnalyticsPage() {
     const [stats, setStats] = useState<AnalyticsStats | null>(null);
     const [trends, setTrends] = useState<TrendData[]>([]);
     const [debugTrends, setDebugTrends] = useState<DebugTrend[]>([]);
     const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+    const [feedback, setFeedback] = useState<FeedbackItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -61,6 +72,7 @@ export default function AnalyticsPage() {
                     setTrends(data.trends || []);
                     setDebugTrends(data.debugTrends || []);
                     setAuditLog(data.auditLog || []);
+                    setFeedback(data.feedback || []);
                 }
             })
             .catch(err => console.error("Failed to load analytics", err))
@@ -230,6 +242,64 @@ export default function AnalyticsPage() {
                                     <tr>
                                         <td colSpan={6} className="px-6 py-8 text-center text-zinc-500 italic">
                                             No events recorded yet.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* Feedback Table */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl overflow-hidden mt-6">
+                    <div className="p-6 border-b border-zinc-800">
+                        <h3 className="text-zinc-300 font-medium uppercase tracking-wider text-xs">User Feedback / Wishes</h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                            <thead className="bg-zinc-950/50 text-zinc-500 font-medium uppercase tracking-wider">
+                                <tr>
+                                    <th className="px-6 py-4">Time</th>
+                                    <th className="px-6 py-4">User</th>
+                                    <th className="px-6 py-4">Feedback</th>
+                                    <th className="px-6 py-4">Attachment</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-800">
+                                {feedback.map((item) => (
+                                    <tr key={item.id} className="hover:bg-zinc-800/20 transition-colors">
+                                        <td className="px-6 py-4 text-zinc-400 font-mono">
+                                            {new Date(item.timestamp).toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="text-white font-medium">{item.name || item.sso_user || 'Anonymous'}</span>
+                                                {item.email && <span className="text-zinc-500 text-[10px]">{item.email}</span>}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-zinc-300 max-w-md whitespace-pre-wrap">
+                                            {item.feedback}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {item.image_path ? (
+                                                <a
+                                                    href={item.image_path}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 transition-colors"
+                                                >
+                                                    <Paperclip className="w-3 h-3" /> View Image
+                                                </a>
+                                            ) : (
+                                                <span className="text-zinc-600">-</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                                {feedback.length === 0 && (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center text-zinc-500 italic">
+                                            No feedback submitted yet.
                                         </td>
                                     </tr>
                                 )}
