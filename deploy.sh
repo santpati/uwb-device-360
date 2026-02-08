@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # Configuration
 PEM_FILE="/Users/santpati/Desktop/Folders/AI/Santosh-Demo.pem"
