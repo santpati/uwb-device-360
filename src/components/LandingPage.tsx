@@ -36,9 +36,20 @@ export default function LandingPage({ onSave }: LandingPageProps) {
             setSysToken(storedSys);
             try {
                 const decoded = jwtDecode<DecodedToken>(storedSys);
-                setDecodedData(decoded);
+                // Check if expired
+                const currentTime = Date.now() / 1000;
+                if (decoded.exp < currentTime) {
+                    console.warn("Stored token expired");
+                    setDecodedData(null);
+                    localStorage.removeItem("sys_token"); // Clean up
+                    setSysToken(""); // Optional: clear input or keep it for user to refresh
+                } else {
+                    setDecodedData(decoded);
+                }
             } catch (e) {
                 console.error("Invalid stored token", e);
+                setDecodedData(null);
+                localStorage.removeItem("sys_token");
             }
         }
         if (storedFirehose) setFirehoseApiKey(storedFirehose);
@@ -132,10 +143,10 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                                 </div>
                             </div>
                         </div>
-                        <h1 className="text-5xl font-bold tracking-tight mb-4 text-white">
+                        <h1 className="text-3xl font-bold tracking-tight mb-4 text-white">
                             {getGreeting()}.
                         </h1>
-                        <p className="text-zinc-400 text-lg leading-relaxed max-w-md">
+                        <p className="text-zinc-400 text-base leading-relaxed max-w-md">
                             Are you looking to onboard Cisco Asset tag and experience Sub-meter accuracy? Lets get you started in onboarding and debugigng your UWB tag journey.
                         </p>
                     </div>
@@ -146,7 +157,7 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                         <div className="space-y-3">
                             <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                                 <Lock className="w-3 h-3" />
-                                Sys Token <span className="text-red-500">*</span>
+                                Sys Token <span className="text-zinc-500 normal-case">(Mandatory)</span> <span className="text-red-500 font-bold">*</span>
                                 <div className="group relative ml-auto">
                                     <Info className="w-4 h-4 text-zinc-500 hover:text-indigo-400 cursor-help transition-colors" />
                                     <div className="absolute right-0 top-full mt-2 w-[480px] bg-zinc-900 text-zinc-300 text-xs p-4 rounded-2xl border border-zinc-700 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 leading-relaxed translate-y-2 group-hover:translate-y-0">
@@ -174,25 +185,68 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                             />
                         </div>
 
-                        {/* Decoded Info Preview */}
+                        {/* Decoded Info Preview & Validation Status */}
                         {decodedData && (
-                            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between text-xs animate-in fade-in slide-in-from-top-2">
-                                <div className="flex items-center gap-2 text-emerald-300 font-medium">
-                                    <Key className="w-3 h-3" />
-                                    <span>Token Valid</span>
+                            <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Token Valid</span>
+                                    </div>
+                                    <div className="text-zinc-400 font-mono">
+                                        Tenant: {decodedData.tenantId}
+                                    </div>
                                 </div>
-                                <div className="text-zinc-400 font-mono">
-                                    Tenant: {decodedData.tenantId}
+                                <div className="grid grid-cols-2 gap-2 text-[10px] text-zinc-500 uppercase tracking-wider font-medium">
+                                    <div className="bg-zinc-900/50 rounded-lg p-2 border border-zinc-800">
+                                        <span className="block text-zinc-600 mb-1">SSO User</span>
+                                        <span className="text-zinc-300 normal-case tracking-normal truncate block" title={decodedData.ssoUser || decodedData.email}>
+                                            {decodedData.ssoUser || decodedData.email || "Unknown"}
+                                        </span>
+                                    </div>
+                                    <div className="bg-zinc-900/50 rounded-lg p-2 border border-zinc-800">
+                                        <span className="block text-zinc-600 mb-1">Expires</span>
+                                        <span className="text-zinc-300 normal-case tracking-normal">
+                                            {new Date(decodedData.exp * 1000).toLocaleDateString()}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {/* Firehose API Key */}
                         <div className="space-y-3">
-                            <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                <Radio className="w-3 h-3" />
-                                Firehose API Key <span className="text-zinc-600 normal-case ml-1 tracking-normal">(Optional)</span>
-                            </label>
+                            <div className="flex items-center justify-between">
+                                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                                    <Radio className="w-3 h-3" />
+                                    Firehose API Key <span className="text-zinc-600 normal-case ml-1 tracking-normal">(Optional)</span>
+                                </label>
+
+                                {/* Cisco Live EU Toggle */}
+                                <label className="flex items-center gap-2 cursor-pointer group">
+                                    <input
+                                        type="checkbox"
+                                        className="peer sr-only"
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                const keys = [
+                                                    "B3DB01B8C4B64856BE66CB862FF84F57",
+                                                    "62C0ABE8D7C84DB58C1B8EA9805D2CE0",
+                                                    "EA39257AB6CF41FDBA265C97FCF9A95D"
+                                                ];
+                                                const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                                                setFirehoseApiKey(randomKey);
+                                            } else {
+                                                setFirehoseApiKey("");
+                                            }
+                                        }}
+                                    />
+                                    <div className="w-8 h-4 bg-zinc-800 rounded-full peer-checked:bg-indigo-600 transition-colors relative">
+                                        <div className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
+                                    </div>
+                                    <span className="text-[10px] text-zinc-500 group-hover:text-indigo-400 transition-colors font-medium">Use Cisco Live EU</span>
+                                </label>
+                            </div>
                             <input
                                 type="password"
                                 value={firehoseApiKey}
