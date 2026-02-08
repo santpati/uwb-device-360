@@ -2,8 +2,10 @@
 
 import { Activity } from "lucide-react";
 import {
-    Area,
-    AreaChart,
+    ComposedChart,
+    Bar,
+    Line,
+    CartesianGrid,
     ResponsiveContainer,
     Tooltip,
     XAxis,
@@ -39,13 +41,14 @@ export default function DebugsChart({ total, trends }: DebugsChartProps) {
             {/* Right: Chart */}
             <div className="flex-grow w-full h-[200px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data}>
+                    <ComposedChart data={data}>
                         <defs>
                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
                                 <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                             </linearGradient>
                         </defs>
+                        <CartesianGrid vertical={false} stroke="#333" strokeDasharray="3 3" />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', fontSize: '12px' }}
                             itemStyle={{ color: '#818cf8' }}
@@ -57,16 +60,11 @@ export default function DebugsChart({ total, trends }: DebugsChartProps) {
                             fontSize={10}
                             tickLine={false}
                             axisLine={false}
+                            interval={data.length > 60 ? 6 : data.length > 30 ? 2 : 0}
                         />
-                        <Area
-                            type="monotone"
-                            dataKey="count"
-                            stroke="#6366f1"
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorCount)"
-                        />
-                    </AreaChart>
+                        <Bar dataKey="count" barSize={data.length > 60 ? 4 : 8} fill="#6366f1" radius={[2, 2, 0, 0]} fillOpacity={0.6} />
+                        <Line type="monotone" dataKey="count" stroke="#818cf8" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                    </ComposedChart>
                 </ResponsiveContainer>
             </div>
         </div>

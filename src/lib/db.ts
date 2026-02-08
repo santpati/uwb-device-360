@@ -69,11 +69,15 @@ export function getAnalyticsStats() {
             FROM events 
             WHERE event_type = 'debug_device'
             GROUP BY 1
+        ),
+        cumulative AS (
+            SELECT 
+                date,
+                SUM(daily_count) OVER (ORDER BY date) as count
+            FROM daily_counts
         )
-        SELECT 
-            date,
-            SUM(daily_count) OVER (ORDER BY date) as count
-        FROM daily_counts
+        SELECT * FROM cumulative
+        WHERE date >= date('now', '-90 days')
         ORDER BY date ASC
     `).all();
 
