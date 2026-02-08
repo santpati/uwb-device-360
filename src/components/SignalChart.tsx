@@ -34,9 +34,10 @@ interface SignalChartProps {
     macAddress: string;
     apiKey: string;
     ssoUser?: string;
+    onSignalDetected?: (type: 'BLE' | 'UWB') => void;
 }
 
-export default function SignalChart({ macAddress, apiKey, ssoUser }: SignalChartProps) {
+export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetected }: SignalChartProps) {
     const [data, setData] = useState<SignalPoint[]>([]);
     const [events, setEvents] = useState<EventLog[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
@@ -141,6 +142,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser }: SignalChart
                 y: detectedPos?.yPos || precisePos?.yPos,
                 z: detectedPos?.zPos || precisePos?.zPos
             };
+            if (onSignalDetected) onSignalDetected('UWB');
         } else {
             type = 'BLE_RSSI';
             if (event.maxDetectedRssi !== undefined && event.maxDetectedRssi !== 0) {
@@ -151,6 +153,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser }: SignalChart
                 rssi = -100;
             }
             details = { rssi, channel: telemetry.channel };
+            if (onSignalDetected) onSignalDetected('BLE');
         }
 
         const timestamp = event.recordTimestamp || Date.now();

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, MapPin, Wifi, Box, History as HistoryIcon } from "lucide-react";
+import { Search, MapPin, Wifi, Box, History as HistoryIcon, Activity, Radio, CheckCircle2 } from "lucide-react";
+import confetti from 'canvas-confetti';
 import { fetchProxy } from "@/lib/api";
 import SignalChart from "@/components/SignalChart";
 import DeviceLifecycle from "@/components/DeviceLifecycle";
@@ -46,6 +47,27 @@ interface DeviceDebuggerProps {
 
 export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, isActive }: DeviceDebuggerProps) {
     const [deviceMac, setDeviceMac] = useState(initialMac);
+    const [signalsDetected, setSignalsDetected] = useState({ ble: false, uwb: false });
+
+    const handleSignalDetected = (type: 'BLE' | 'UWB') => {
+        setSignalsDetected(prev => {
+            if (type === 'UWB' && !prev.uwb) {
+                // Trigger Confetti on First UWB Pulse
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#10b981', '#34d399', '#059669', '#ffffff'] // Green/White theme
+                });
+                return { ...prev, uwb: true };
+            }
+            if (type === 'BLE' && !prev.ble) {
+                return { ...prev, ble: true };
+            }
+            return prev;
+        });
+    };
+
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
     const [showRecent, setShowRecent] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -358,40 +380,93 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                     )}
                 </div>
 
-                {/* Location Card */}
-                <div className="col-span-1 lg:col-span-2 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative">
-                    <h3 className="text-zinc-400 font-medium mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                        Real-time Location
-                    </h3>
-                    {locationData ? (
-                        <div className="flex flex-col md:flex-row gap-8">
-                            <div className="flex-1 bg-zinc-950 rounded-2xl border border-zinc-800 p-4 relative overflow-hidden min-h-[200px] flex items-center justify-center">
-                                {/* Placeholder for Map - visualizing coords */}
-                                <div className="absolute inset-0 bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
-                                <div className="relative z-10 flex flex-col items-center">
-                                    <MapPin className="w-8 h-8 text-blue-500 mb-2 animate-bounce" />
-                                    <div className="font-mono text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded">
-                                        {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
+                {/* Right Column: Location & Signals */}
+                <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+                    {/* Location Card */}
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative flex-1">
+                        <h3 className="text-zinc-400 font-medium mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                            Real-time Location
+                        </h3>
+                        {locationData ? (
+                            <div className="flex flex-col md:flex-row gap-8">
+                                <div className="flex-1 bg-zinc-950 rounded-2xl border border-zinc-800 p-4 relative overflow-hidden min-h-[200px] flex items-center justify-center">
+                                    <div className="absolute inset-0 bg-[radial-gradient(#3f3f46_1px,transparent_1px)] [background-size:16px_16px] opacity-20"></div>
+                                    <div className="relative z-10 flex flex-col items-center">
+                                        <MapPin className="w-8 h-8 text-blue-500 mb-2 animate-bounce" />
+                                        <div className="font-mono text-xs text-blue-400 bg-blue-500/10 px-2 py-1 rounded">
+                                            {locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="w-full md:w-48 space-y-4">
+                                    <div>
+                                        <span className="block text-zinc-500 text-sm">Compute Type</span>
+                                        <span className="text-white font-medium block mt-1">{locationData.computeType || 'Unknown'}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-zinc-500 text-sm">Last Located</span>
+                                        <span className="text-zinc-300 text-sm block mt-1">{locationData.lastLocatedTime ? new Date(locationData.lastLocatedTime).toLocaleString() : 'N/A'}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="w-full md:w-48 space-y-4">
-                                <div>
-                                    <span className="block text-zinc-500 text-sm">Compute Type</span>
-                                    <span className="text-white font-medium block mt-1">{locationData.computeType || 'Unknown'}</span>
+                        ) : (
+                            <div className="h-48 flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
+                                Waiting for location stream...
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Signal Status Card */}
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative">
+                        <h3 className="text-zinc-400 font-medium mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                            Signal Status
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Sign of Life */}
+                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${locationData ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                                <div className={`p-2 rounded-xl ${locationData ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                    <Activity className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <span className="block text-zinc-500 text-sm">Last Located</span>
-                                    <span className="text-zinc-300 text-sm block mt-1">{locationData.lastLocatedTime ? new Date(locationData.lastLocatedTime).toLocaleString() : 'N/A'}</span>
+                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Sign of Life</span>
+                                    <div className="flex items-center gap-2">
+                                        {locationData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                        <span className={`text-sm font-medium ${locationData ? 'text-white' : 'text-zinc-600'}`}>{locationData ? 'Active' : 'Pending'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* BLE Signal */}
+                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.ble ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                                <div className={`p-2 rounded-xl ${signalsDetected.ble ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                    <Wifi className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">BLE Signal</span>
+                                    <div className="flex items-center gap-2">
+                                        {signalsDetected.ble ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                        <span className={`text-sm font-medium ${signalsDetected.ble ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.ble ? 'Detected' : 'Searching'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* UWB Signal */}
+                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.uwb ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                                <div className={`p-2 rounded-xl ${signalsDetected.uwb ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                    <Radio className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">UWB Signal</span>
+                                    <div className="flex items-center gap-2">
+                                        {signalsDetected.uwb ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                        <span className={`text-sm font-medium ${signalsDetected.uwb ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.uwb ? 'Detected' : 'Searching'}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    ) : (
-                        <div className="h-48 flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
-                            Waiting for location stream...
-                        </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* Device Lifecycle Widget */}
@@ -405,11 +480,16 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                     ) : null}
                 </div>
 
-                {/* Signal Strength (BLE & UWB) - Only show if API Key is present */}
+                {/* Signal Strength Data & Chart */}
                 {tokens?.firehoseApiKey ? (
                     <div className="col-span-1 lg:col-span-3">
                         {deviceData ? (
-                            <SignalChart macAddress={deviceData.macAddress} apiKey={tokens.firehoseApiKey} ssoUser={tokens.ssoUser} />
+                            <SignalChart
+                                macAddress={deviceData.macAddress}
+                                apiKey={tokens.firehoseApiKey}
+                                ssoUser={tokens.ssoUser}
+                                onSignalDetected={handleSignalDetected}
+                            />
                         ) : (
                             <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6">
                                 <div className="flex items-center justify-between mb-6">
