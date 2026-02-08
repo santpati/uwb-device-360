@@ -105,11 +105,17 @@ export default function LandingPage({ onSave }: LandingPageProps) {
             <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
 
                 {/* Left Column: Configuration */}
+                {/* Validated Header Structure */}
                 <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
                     <div>
-                        <div className="flex items-center gap-4 mb-6">
-                            <img src="/cisco-uwb-logo.png" alt="Cisco UWB" className="w-16 h-16 object-contain" />
-                            <span className="text-zinc-500 font-medium text-sm tracking-wider uppercase border-l border-zinc-700 pl-4 py-1">UWB 360 Dashboard</span>
+                        <div className="flex flex-col gap-1 mb-8">
+                            <div className="flex items-center gap-4">
+                                <img src="/cisco-uwb-logo.png" alt="Cisco UWB" className="w-16 h-16 object-contain" />
+                                <div className="flex flex-col">
+                                    <span className="text-white font-bold text-2xl tracking-tight">UWB 360 DASHBOARD</span>
+                                    <span className="text-indigo-400 font-medium text-sm tracking-wide uppercase bg-indigo-500/10 px-2 py-0.5 rounded-md self-start border border-indigo-500/20">Cisco Internal Tool</span>
+                                </div>
+                            </div>
                         </div>
                         <h1 className="text-5xl font-bold tracking-tight mb-4 text-white">
                             {getGreeting()}.
@@ -198,36 +204,24 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                     <div className="relative group">
                         <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
                         <div className="relative aspect-video rounded-xl bg-black overflow-hidden border border-zinc-800 shadow-2xl">
-                            {!isPlaying ? (
-                                <div
-                                    className="absolute inset-0 flex items-center justify-center cursor-pointer bg-zinc-900 hover:bg-zinc-800 transition-colors group/play"
-                                    onClick={handlePlayVideo}
-                                >
-                                    <div className="text-center space-y-4">
-                                        <div className="w-20 h-20 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30 group-hover/play:scale-110 transition-transform duration-300">
-                                            <Play className="w-8 h-8 text-white fill-white ml-1" />
-                                        </div>
-                                        <p className="text-zinc-400 font-medium tracking-wide">Watch Quick Start Guide</p>
-                                    </div>
-                                    {/* Fake UI for thumbnail feel */}
-                                    <div className="absolute bottom-4 left-4 right-4 flex gap-2">
-                                        <div className="h-1 flex-1 bg-zinc-800 rounded-full overflow-hidden">
-                                            <div className="h-full w-0 bg-indigo-500"></div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ paddingBottom: '56.25%', position: 'relative', display: 'block', width: '100%' }}>
-                                    <iframe
-                                        src="https://app.vidcast.io/share/embed/a7bd6197-b0b7-4949-b372-52feffaf2243"
-                                        width="100%"
-                                        height="100%"
-                                        title="UWB Device 360 dashboard"
-                                        allow="fullscreen *;autoplay *;"
-                                        style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-                                    ></iframe>
-                                </div>
-                            )}
+                            <video
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity duration-500"
+                                poster="/public/3d-rotation-poster.png" // Optional if we want a poster
+                            >
+                                <source src="/3d-rotation.mp4" type="video/mp4" />
+                                Your browser does not support the video tag.
+                            </video>
+
+                            {/* Overlay Gradient for better integration */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
+
+                            <div className="absolute bottom-4 left-6 pointer-events-none">
+                                <span className="text-white/80 font-medium text-sm bg-black/50 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">360° Device View</span>
+                            </div>
                         </div>
                     </div>
 
