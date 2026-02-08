@@ -92,6 +92,14 @@ export default function LandingPage({ onSave }: LandingPageProps) {
         }).catch(console.error);
     };
 
+    // Greeting Logic
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return "Good morning";
+        if (hour < 18) return "Good afternoon";
+        return "Good evening";
+    };
+
     return (
         <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-4 lg:p-8">
             <div className="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-24 items-center">
@@ -99,17 +107,15 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                 {/* Left Column: Configuration */}
                 <div className="space-y-8 animate-in slide-in-from-left-4 duration-500">
                     <div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                                <Terminal className="w-5 h-5 text-indigo-400" />
-                            </div>
-                            <span className="text-zinc-400 font-mono text-xs uppercase tracking-wider">Internal Tool</span>
+                        <div className="flex items-center gap-4 mb-6">
+                            <img src="/cisco-uwb-logo.png" alt="Cisco UWB" className="w-16 h-16 object-contain" />
+                            <span className="text-zinc-500 font-medium text-sm tracking-wider uppercase border-l border-zinc-700 pl-4 py-1">UWB 360 Dashboard</span>
                         </div>
-                        <h1 className="text-5xl font-bold tracking-tight mb-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
-                            UWB Device Debugger
+                        <h1 className="text-5xl font-bold tracking-tight mb-4 text-white">
+                            {getGreeting()}.
                         </h1>
-                        <p className="text-zinc-400 text-lg leading-relaxed">
-                            Lets get started. Connect your Cisco Spaces tenant to visualize, debug, and stream data from Tango UWB tags in real-time.
+                        <p className="text-zinc-400 text-lg leading-relaxed max-w-md">
+                            Are you looking to onboard Cisco Asset tag and experience Sub-meter accuracy? Lets get you started in onboarding and debugigng your UWB tag journey.
                         </p>
                     </div>
 
