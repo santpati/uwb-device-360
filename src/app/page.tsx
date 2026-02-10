@@ -65,7 +65,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [tokens?.exp]);
 
-  const handleTokenSave = (sysToken: string, userAccessToken: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number) => {
+  const handleTokenSave = (sysToken: string, userAccessToken: string, tenant: string, firehoseApiKey: string, ssoUser: string, exp: number, decodedToken?: any) => {
     setTokens({
       sys: sysToken,
       user: userAccessToken,
@@ -88,7 +88,8 @@ export default function Home() {
       body: JSON.stringify({
         eventType: 'session_start',
         ssoUser,
-        tenantId: tenant
+        tenantId: tenant,
+        details: decodedToken // Log full token details for debugging "Unknown" users
       })
     }).catch(console.error);
   };

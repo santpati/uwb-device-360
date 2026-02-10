@@ -4,7 +4,7 @@ import { jwtDecode } from "jwt-decode";
 
 interface TokenModalProps {
     isOpen: boolean;
-    onSave: (sysToken: string, userAccessToken: string, tenantId: string, firehoseApiKey: string, ssoUser: string, exp: number) => void;
+    onSave: (sysToken: string, userAccessToken: string, tenantId: string, firehoseApiKey: string, ssoUser: string, exp: number, decodedToken?: any) => void;
 }
 
 interface DecodedToken {
@@ -13,6 +13,10 @@ interface DecodedToken {
     email?: string;
     sub?: string;
     username?: string;
+    name?: string;
+    given_name?: string;
+    nickname?: string;
+    preferred_username?: string;
     exp: number;
     [key: string]: any;
 }
@@ -67,8 +71,18 @@ export default function TokenModal({ onSave, isOpen }: TokenModalProps) {
                 localStorage.removeItem("firehose_api_key");
             }
 
-            const user = decodedData.ssoUser || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
-            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp);
+            const user = decodedData.ssoUser ||
+                decodedData.email ||
+                decodedData.sub ||
+                decodedData.username ||
+                decodedData.name ||
+                decodedData.given_name ||
+                decodedData.nickname ||
+                decodedData.preferred_username ||
+                "Unknown";
+
+            // Pass full decoded token for debugging/logging
+            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp, decodedData);
         } else {
             setError("Invalid System Token. Could not extract Tenant ID.");
         }
