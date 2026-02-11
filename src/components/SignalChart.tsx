@@ -125,7 +125,8 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             }
 
             const since = lastTimestampRef.current;
-            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${encodeURIComponent(macAddress)}&since=${since}`);
+            const cleanMac = macAddress.replace(/:/g, '').toLowerCase();
+            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}`);
             if (!res.ok) throw new Error("Failed to fetch events");
 
             const json = await res.json();

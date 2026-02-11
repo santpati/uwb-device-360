@@ -7,7 +7,7 @@ const fs = require('fs');
 const DB_PATH = path.join(__dirname, '..', 'firehose.db');
 const CHECK_INTERVAL_MS = 10000; // Check for new tenants every 10s
 const CLEANUP_INTERVAL_MS = 3600 * 1000; // Cleanup old data every 1h
-const DATA_RETENTION_MS = 3600 * 1000; // Keep data for 1h
+const DATA_RETENTION_MS = 24 * 3600 * 1000; // Keep data for 24h
 const BATCH_INSERT_SIZE = 50;
 const BATCH_FLUSH_INTERVAL = 200; // ms
 

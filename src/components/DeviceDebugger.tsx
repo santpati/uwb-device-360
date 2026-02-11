@@ -483,6 +483,14 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                 {/* Signal Strength Data & Chart */}
                 {tokens?.firehoseApiKey ? (
                     <div className="col-span-1 lg:col-span-3">
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-t-3xl p-4 border-b-0 flex justify-between items-center">
+                            <span className="text-zinc-500 text-xs font-mono">
+                                Firehose Key: <span className="text-zinc-300">{tokens.firehoseApiKey.substring(0, 8)}...</span>
+                            </span>
+                            <span className="text-zinc-600 text-[10px]">
+                                {tokens.tenant ? `Tenant: ${tokens.tenant}` : 'No Tenant ID'}
+                            </span>
+                        </div>
                         {deviceData ? (
                             <SignalChart
                                 macAddress={deviceData.macAddress}
@@ -491,7 +499,7 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                                 onSignalDetected={handleSignalDetected}
                             />
                         ) : (
-                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6">
+                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-b-3xl p-6 border-t-0">
                                 <div className="flex items-center justify-between mb-6">
                                     <h3 className="text-zinc-400 font-medium uppercase tracking-wider text-xs flex items-center gap-2">
                                         <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
