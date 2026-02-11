@@ -157,16 +157,42 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     };
 
     const processEvent = (event: any) => {
+        // Use the timestamp from the API event container
+        const timestamp = event.timestamp || Date.now();
+        const timeLabel = new Date(timestamp).toLocaleTimeString();
+
         if (event.eventType !== 'IOT_TELEMETRY') return;
+
+        let details = event.details;
+
+        // Defensive: Parse details if it's a string (though API should have done it)
+        if (typeof details === 'string') {
+            try {
+                details = JSON.parse(details);
+            } catch (e) {
+                console.warn("Failed to parse details", e);
+            }
+        }
+
+        // Logic: Support both direct and nested telemetry (API variability)
+        const telemetry = details?.iotTelemetry || event.iotTelemetry;
+
+        if (!telemetry) {
+            // Log parsing failure to UI for debugging
+            const errorLog: EventLog = {
+                id: events.length + 1,
+                type: 'ERROR',
+                timestamp: new Date(timestamp).toISOString(),
+                details: { error: 'Missing iotTelemetry', raw: event }
+            };
+            setEvents(prev => [errorLog, ...prev]);
+            return;
+        }
 
         let type: SignalPoint['type'] = 'BLE_RSSI';
         let rssi: number | undefined;
         let confidence: number | undefined;
-        let details: any = {};
-
-        // Fix: API returns details object which contains iotTelemetry
-        const telemetry = event.details?.iotTelemetry || event.iotTelemetry;
-        if (!telemetry) return;
+        let chartDetails: any = {};
 
         const detectedPos = telemetry.detectedPosition;
         const precisePos = telemetry.precisePosition;
@@ -176,7 +202,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         if (isStrictTDOA(detectedPos) || isStrictTDOA(precisePos)) {
             type = 'UWB_TDOA';
             confidence = detectedPos?.confidenceFactor || precisePos?.confidenceFactor || 0;
-            details = {
+            chartDetails = {
                 confidence,
                 x: detectedPos?.xPos || precisePos?.xPos,
                 y: detectedPos?.yPos || precisePos?.yPos,
@@ -192,12 +218,9 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             } else {
                 rssi = -100;
             }
-            details = { rssi, channel: telemetry.channel };
+            chartDetails = { rssi, channel: telemetry.channel };
             if (onSignalDetected) onSignalDetected('BLE');
         }
-
-        const timestamp = event.recordTimestamp || Date.now();
-        const timeLabel = new Date(timestamp).toLocaleTimeString();
 
         // Update Chart Data
         const newPoint: SignalPoint = {
@@ -220,7 +243,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             id: events.length + 1,
             type,
             timestamp: new Date(timestamp).toISOString(),
-            details
+            details: chartDetails
         };
 
         // Prepend to keep latest on top
