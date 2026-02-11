@@ -92,12 +92,30 @@ export function getEvents(tenantId: string, minTimestamp: number): FirehoseEvent
 
 export function getDeviceEvents(tenantId: string, deviceId: string, minTimestamp: number): FirehoseEvent[] {
     const db = getDb();
+
+    // Normalize input
+    const clean = deviceId.replace(/[^a-fA-F0-9]/g, '').toLowerCase();
+
+    // Generate candidates
+    const candidates = new Set<string>();
+    candidates.add(deviceId); // As provided
+    candidates.add(clean); // Clean hex
+
+    // Add colon-separated format (aa:bb:cc...)
+    if (clean.length === 12) {
+        const colon = clean.match(/.{1,2}/g)?.join(':');
+        if (colon) candidates.add(colon);
+    }
+
+    const candidateArray = Array.from(candidates);
+    const placeholders = candidateArray.map(() => '?').join(',');
+
     const rows = db.prepare(`
         SELECT * FROM events 
-        WHERE tenant_id = ? AND device_id = ? AND timestamp > ?
+        WHERE tenant_id = ? AND device_id IN (${placeholders}) AND timestamp > ?
         ORDER BY timestamp ASC
         LIMIT 500
-    `).all(tenantId, deviceId, minTimestamp) as any[];
+    `).all(tenantId, ...candidateArray, minTimestamp) as any[];
 
     return rows.map(row => ({
         id: row.id,
