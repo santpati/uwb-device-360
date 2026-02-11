@@ -64,7 +64,7 @@ export default function AnalyticsPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/analytics/stats')
+        fetch('/api/audit/stats')
             .then(res => res.json())
             .then(data => {
                 if (data.stats) {

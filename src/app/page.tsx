@@ -82,7 +82,7 @@ export default function Home() {
     if (firehoseApiKey) localStorage.setItem("firehose_api_key", firehoseApiKey);
     if (userAccessToken) localStorage.setItem("user_token", userAccessToken);
 
-    fetch('/api/analytics/track', {
+    fetch('/api/audit/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -95,7 +95,7 @@ export default function Home() {
   };
 
   const trackEvent = (eventType: string, details?: any) => {
-    fetch('/api/analytics/track', {
+    fetch('/api/audit/track', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

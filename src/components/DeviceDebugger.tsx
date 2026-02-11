@@ -154,7 +154,7 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
 
                     // Track Debug Event - We might want to move this up or keep it here
                     // Keeping it here means we track successful searches per component
-                    fetch('/api/analytics/track', {
+                    fetch('/api/audit/track', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

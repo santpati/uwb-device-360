@@ -107,7 +107,7 @@ export default function LandingPage({ onSave }: LandingPageProps) {
     const handlePlayVideo = () => {
         setIsPlaying(true);
         // Track Video Click
-        fetch('/api/analytics/track', {
+        fetch('/api/audit/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
