@@ -38,3 +38,7 @@ next-env.d.ts
 firehose.db
 firehose.db-shm
 firehose.db-wal
+
+analytics.db
+analytics.db-shm
+analytics.db-wal
