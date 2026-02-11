@@ -45,31 +45,48 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     const abortControllerRef = useRef<AbortController | null>(null);
 
     const [lastTimestamp, setLastTimestamp] = useState<number>(Date.now() - 10000); // Start looking 10s back
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Refs for stable access to state inside recursive polling function
+    const lastTimestampRef = useRef(lastTimestamp);
+    const isStreamingRef = useRef(isStreaming);
+
+    useEffect(() => {
+        lastTimestampRef.current = lastTimestamp;
+    }, [lastTimestamp]);
+
+    useEffect(() => {
+        isStreamingRef.current = isStreaming;
+    }, [isStreaming]);
+
+    // Auto-start check and cleanup
+    useEffect(() => {
+        const checkStatus = async () => {
+            const tenantId = localStorage.getItem('tenant_id');
+            if (!tenantId || isStreamingRef.current) return; // Use ref for latest streaming status
+
+            try {
+                const res = await fetch(`/api/firehose/status?tenantId=${tenantId}`);
+                const data = await res.json();
+                if (data.active) {
+                    startStream();
+                }
+            } catch (e) {
+                console.error("Auto-start check failed", e);
+            }
+        };
+
+        checkStatus();
+        return () => stopStream(); // Cleanup on unmount
+    }, []); // Empty dependency array means this runs once on mount
 
     const startStream = async () => {
-        if (isStreaming) return;
+        if (isStreamingRef.current) return; // Use ref for latest streaming status
         setIsStreaming(true);
         setError(null);
         setData([]);
         setEvents([]);
         setLastTimestamp(Date.now() - 10000);
-
-        // 1. Register Tenant (and API Key if provided)
-        // We use the tenantId from ssoUser context or pass it in. 
-        // But SignalChart props only has apiKey and ssoUser. 
-        // We need tenantId. We can extract it from the token context in parent, 
-        // but for now let's assume valid access implies we can register.
-        // Actually, we need to call the register endpoint.
-        // We might need to pass `tenantId` as a prop to SignalChart.
-
-        // For now, let's assume the parent has done registration or we do it here if we have the ID.
-        // But wait, the prompt says "when any user start debugging session (by providing the sys-token and API key) - if for that tenant firehose command is not started then it should start"
-        // This suggests we should trigger registration here.
-
-        // Let's decode the API Key to find tenant? No, API Key doesn't have tenant ID in clear text usually.
-        // The parent component `DeviceDebugger` has `tokens` which has `tenant`.
-        // We need to pass `tenantId` to SignalChart.
 
         // START_STREAM event tracking
         fetch('/api/analytics/track', {
@@ -82,7 +99,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             })
         }).catch(console.error);
 
-        // Initial Registration
+        // Initial Registration (Idempotent)
         const tenantId = localStorage.getItem('tenant_id');
         if (tenantId) {
             fetch('/api/firehose/register', {
@@ -92,33 +109,29 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             }).catch(console.error);
         }
 
-        // Polling Logic
-        pollingIntervalRef.current = setInterval(pollEvents, 1000);
+        // Start Polling Loop
+        pollEvents();
     };
 
+    // Redefine pollEvents to be stable and use Refs for state that changes
     const pollEvents = async () => {
+        if (!isStreamingRef.current) return;
+
         try {
-            // We need tenantId here. I will look for it in localStorage or props.
-            // Ideally props. 
             const tenantId = localStorage.getItem('tenant_id');
             if (!tenantId) {
                 console.error("No tenant ID found");
                 return;
             }
 
-            // Register if not registered (we can do this once or lazily)
-            // But efficient way is to rely on register API being called.
-            // Let's ensure we register ONCE at start.
-
-            // Fetch events
-            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${encodeURIComponent(macAddress)}&since=${lastTimestamp}`);
+            const since = lastTimestampRef.current;
+            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${encodeURIComponent(macAddress)}&since=${since}`);
             if (!res.ok) throw new Error("Failed to fetch events");
 
             const json = await res.json();
             if (json.events && json.events.length > 0) {
-                // Update timestamp to the latest one seen
                 const maxTime = Math.max(...json.events.map((e: any) => e.timestamp));
-                setLastTimestamp(maxTime);
+                setLastTimestamp(maxTime); // This updates Ref via effect
 
                 // Process events
                 json.events.forEach((e: any) => processEvent(e));
@@ -126,14 +139,18 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
         } catch (e: any) {
             console.error("Polling error", e);
-            // Don't stop streaming on transient errors
+        } finally {
+            // Schedule next poll if still streaming
+            if (isStreamingRef.current) {
+                pollingTimeoutRef.current = setTimeout(pollEvents, 1000);
+            }
         }
     };
 
     const stopStream = () => {
-        if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
+        if (pollingTimeoutRef.current) {
+            clearTimeout(pollingTimeoutRef.current);
+            pollingTimeoutRef.current = null;
         }
         setIsStreaming(false);
     };

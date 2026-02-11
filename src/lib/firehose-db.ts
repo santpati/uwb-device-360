@@ -3,11 +3,17 @@ import path from 'path';
 
 // Connect to the same DB as the worker
 const dbPath = path.join(process.cwd(), 'firehose.db');
-const db = new Database(dbPath);
 
-// Enable WAL for concurrent access from App (Read/Write) and Worker (Read/Write)
-// SQLite handles locking automatically in WAL mode
-db.pragma('journal_mode = WAL');
+// Lazy load DB
+let dbInstance: Database.Database | null = null;
+
+function getDb() {
+    if (!dbInstance) {
+        dbInstance = new Database(dbPath);
+        dbInstance.pragma('journal_mode = WAL');
+    }
+    return dbInstance;
+}
 
 // Types
 export interface TenantConfig {
@@ -31,6 +37,7 @@ export interface FirehoseEvent {
 // Functions
 
 export function registerTenant(id: string, name: string, apiKey: string) {
+    const db = getDb();
     const stmt = db.prepare(`
         INSERT INTO tenants (id, name, api_key, is_active, last_seen)
         VALUES (@id, @name, @api_key, 1, @now)
@@ -50,6 +57,7 @@ export function registerTenant(id: string, name: string, apiKey: string) {
 }
 
 export function getTenant(id: string): TenantConfig | undefined {
+    const db = getDb();
     const row = db.prepare("SELECT * FROM tenants WHERE id = ?").get(id) as any;
     if (!row) return undefined;
 
@@ -63,6 +71,7 @@ export function getTenant(id: string): TenantConfig | undefined {
 }
 
 export function getEvents(tenantId: string, minTimestamp: number): FirehoseEvent[] {
+    const db = getDb();
     const rows = db.prepare(`
         SELECT * FROM events 
         WHERE tenant_id = ? AND timestamp > ?
@@ -82,6 +91,7 @@ export function getEvents(tenantId: string, minTimestamp: number): FirehoseEvent
 }
 
 export function getDeviceEvents(tenantId: string, deviceId: string, minTimestamp: number): FirehoseEvent[] {
+    const db = getDb();
     const rows = db.prepare(`
         SELECT * FROM events 
         WHERE tenant_id = ? AND device_id = ? AND timestamp > ?
