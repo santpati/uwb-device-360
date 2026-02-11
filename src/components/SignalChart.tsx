@@ -164,7 +164,8 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         let confidence: number | undefined;
         let details: any = {};
 
-        const telemetry = event.iotTelemetry;
+        // Fix: API returns details object which contains iotTelemetry
+        const telemetry = event.details?.iotTelemetry || event.iotTelemetry;
         if (!telemetry) return;
 
         const detectedPos = telemetry.detectedPosition;
