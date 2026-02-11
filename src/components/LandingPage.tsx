@@ -21,7 +21,7 @@ interface DecodedToken {
 
 // ... (inside component)
 
-const user = decodedData.ssoUser || decodedData.userName || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
+
 
 export default function LandingPage({ onSave }: LandingPageProps) {
     // Form State
