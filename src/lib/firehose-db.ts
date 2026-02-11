@@ -110,14 +110,20 @@ export function getDeviceEvents(tenantId: string, deviceId: string, minTimestamp
     const candidateArray = Array.from(candidates);
     const placeholders = candidateArray.map(() => '?').join(',');
 
+    const placeholderString = typeof placeholders === 'string' ? placeholders : ''; // Safety check, though logically it's correct
+
+    // FETCH LATEST 500 EVENTS (DESC), THEN REVERSE
     const rows = db.prepare(`
         SELECT * FROM events 
         WHERE tenant_id = ? AND device_id IN (${placeholders}) AND timestamp > ?
-        ORDER BY timestamp ASC
+        ORDER BY timestamp DESC
         LIMIT 500
     `).all(tenantId, ...candidateArray, minTimestamp) as any[];
 
-    return rows.map(row => ({
+    // Reverse to chronological order (Oldest -> Newest) for the chart
+    const chronRows = rows.reverse();
+
+    return chronRows.map(row => ({
         id: row.id,
         tenantId: row.tenant_id,
         deviceId: row.device_id,

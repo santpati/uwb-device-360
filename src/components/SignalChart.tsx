@@ -44,7 +44,8 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     const [error, setError] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    const [lastTimestamp, setLastTimestamp] = useState<number>(Date.now() - 10000); // Start looking 10s back
+    // Start looking from 0 (beginning of time) to catch latest history on load, since API now returns latest 500 DESC
+    const [lastTimestamp, setLastTimestamp] = useState<number>(0);
     const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Refs for stable access to state inside recursive polling function
@@ -86,7 +87,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         setError(null);
         setData([]);
         setEvents([]);
-        setLastTimestamp(Date.now() - 10000);
+        setLastTimestamp(0);
 
         // START_STREAM event tracking
         fetch('/api/analytics/track', {
