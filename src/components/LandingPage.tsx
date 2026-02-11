@@ -11,12 +11,17 @@ interface LandingPageProps {
 interface DecodedToken {
     tenantId: number | string;
     ssoUser?: string;
+    userName?: string;
     email?: string;
     sub?: string;
     username?: string;
     exp: number;
     [key: string]: any;
 }
+
+// ... (inside component)
+
+const user = decodedData.ssoUser || decodedData.userName || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
 
 export default function LandingPage({ onSave }: LandingPageProps) {
     // Form State
@@ -92,7 +97,7 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                 localStorage.removeItem("firehose_api_key");
             }
 
-            const user = decodedData.ssoUser || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
+            const user = decodedData.ssoUser || decodedData.userName || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
             onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp);
         } else {
             setError("Invalid System Token. Could not extract Tenant ID.");
