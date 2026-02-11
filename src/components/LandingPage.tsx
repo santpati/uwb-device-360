@@ -5,7 +5,7 @@ import { Lock, Radio, Info, Key, Play, Terminal, CheckCircle2, Sparkles } from "
 import { jwtDecode } from "jwt-decode";
 
 interface LandingPageProps {
-    onSave: (sysToken: string, userAccessToken: string, tenantId: string, firehoseApiKey: string, ssoUser: string, exp: number) => void;
+    onSave: (sysToken: string, userAccessToken: string, tenantId: string, firehoseApiKey: string, ssoUser: string, exp: number, decodedToken?: any) => void;
 }
 
 interface DecodedToken {
@@ -98,7 +98,7 @@ export default function LandingPage({ onSave }: LandingPageProps) {
             }
 
             const user = decodedData.ssoUser || decodedData.userName || decodedData.email || decodedData.sub || decodedData.username || "Unknown";
-            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp);
+            onSave(sysToken, "", String(decodedData.tenantId), firehoseApiKey, user, decodedData.exp, decodedData);
         } else {
             setError("Invalid System Token. Could not extract Tenant ID.");
         }
