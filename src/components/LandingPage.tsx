@@ -24,6 +24,16 @@ export default function LandingPage({ onSave }: LandingPageProps) {
     const [firehoseApiKey, setFirehoseApiKey] = useState("");
     const [decodedData, setDecodedData] = useState<DecodedToken | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [browserType, setBrowserType] = useState<'chrome' | 'firefox' | 'other'>('other');
+
+    useEffect(() => {
+        const ua = navigator.userAgent;
+        if (ua.includes("Firefox")) {
+            setBrowserType('firefox');
+        } else if (ua.includes("Chrome")) {
+            setBrowserType('chrome');
+        }
+    }, []);
 
     // Video State
     const [isPlaying, setIsPlaying] = useState(false);
@@ -155,6 +165,33 @@ export default function LandingPage({ onSave }: LandingPageProps) {
 
                         {/* Sys Token Input */}
                         <div className="space-y-3">
+                            {/* Extension Promo Banner */}
+                            <a
+                                href={browserType === 'firefox' ? '/browser-extension-firefox' : '/browser-extension-chrome'}
+                                className="block mb-2 p-3 bg-gradient-to-r from-indigo-900/40 to-purple-900/40 border border-indigo-500/30 rounded-xl group cursor-pointer hover:border-indigo-400/50 transition-all relative overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-indigo-500/5 group-hover:bg-indigo-500/10 transition-colors"></div>
+                                <div className="flex items-center justify-between relative z-10">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-indigo-500 shadow-lg shadow-indigo-500/40 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide animate-pulse">New</div>
+                                        <div className="flex flex-col">
+                                            <p className="text-sm text-indigo-100 font-medium leading-none">
+                                                Easily copy your Sys-Token
+                                            </p>
+                                            <p className="text-xs text-indigo-300 mt-1">
+                                                Use our <span className="text-white font-bold border-b border-indigo-400/50 pb-0.5 transition-colors group-hover:border-indigo-400">{browserType === 'firefox' ? 'Firefox Add-on' : 'Chrome Extension'}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1 shadow-lg">
+                                        Get it
+                                        <svg className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                        </svg>
+                                    </div>
+                                </div>
+                            </a>
+
                             <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
                                 <Lock className="w-3 h-3" />
                                 Sys Token <span className="text-zinc-500 normal-case">(Mandatory)</span> <span className="text-red-500 font-bold">*</span>
