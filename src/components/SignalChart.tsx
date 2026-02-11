@@ -121,16 +121,37 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         try {
             const tenantId = localStorage.getItem('tenant_id');
             if (!tenantId) {
-                console.error("No tenant ID found");
+                const msg = "Missing Tenant ID in LocalStorage. Please re-configure.";
+                setError(msg);
+                setEvents(prev => [{ id: Date.now(), type: 'ERROR', timestamp: new Date().toISOString(), details: { error: msg } }, ...prev]);
+                setIsStreaming(false);
                 return;
             }
 
             const since = lastTimestampRef.current;
             const cleanMac = macAddress.replace(/:/g, '').toLowerCase();
-            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}`);
-            if (!res.ok) throw new Error("Failed to fetch events");
+            const url = `/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}`;
+
+            // DEBUG LOG (Verbose)
+            // console.log("Fetching", url);
+
+            const res = await fetch(url);
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(`API Error ${res.status}: ${text}`);
+            }
 
             const json = await res.json();
+
+            // Log fetch result if empty (to diagnose "No Signal")
+            if (!json.events || json.events.length === 0) {
+                if (events.length === 0) {
+                    // Only log "No data" if we have NOTHING shown yet, so user knows we tried.
+                    // But don't spam it every second.
+                    // We can use a ref to track if we've warned about empty data
+                }
+            }
+
             if (json.events && json.events.length > 0) {
                 const maxTime = Math.max(...json.events.map((e: any) => e.timestamp));
                 setLastTimestamp(maxTime); // This updates Ref via effect
@@ -141,8 +162,11 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
         } catch (e: any) {
             console.error("Polling error", e);
+            setError(e.message);
+            setEvents(prev => [{ id: Date.now(), type: 'ERROR', timestamp: new Date().toISOString(), details: { error: e.message } }, ...prev]);
+            setIsStreaming(false); // Stop on error to prevent loop spam
         } finally {
-            // Schedule next poll if still streaming
+            // Schedule next poll if still streaming and no critical error stopped it
             if (isStreamingRef.current) {
                 pollingTimeoutRef.current = setTimeout(pollEvents, 1000);
             }
@@ -274,6 +298,9 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
                     <h3 className="text-zinc-400 font-medium uppercase tracking-wider text-xs flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
                         Signal Analysis (Live Stream)
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 font-mono text-[10px] normal-case tracking-normal">
+                            {localStorage.getItem('tenant_id') || 'No Tenant'} :: {macAddress}
+                        </span>
                     </h3>
                     <div className="flex items-center gap-2">
                         {!isStreaming ? (
