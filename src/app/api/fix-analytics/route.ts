@@ -9,32 +9,15 @@ export async function GET() {
         const dbPath = path.join(process.cwd(), 'analytics.db');
         const db = new Database(dbPath);
 
-        // Get all events where sso_user is 'Unknown' and details is not null
-        const rows = db.prepare("SELECT id, details FROM events WHERE sso_user = 'Unknown' AND details IS NOT NULL").all() as { id: number, details: string }[];
-
-        let updatedCount = 0;
-        const updateStmt = db.prepare("UPDATE events SET sso_user = ? WHERE id = ?");
-
-        for (const row of rows) {
-            try {
-                const details = JSON.parse(row.details);
-                // Check key fields
-                const user = details.userName || details.ssoUser || details.email || details.sub || details.username;
-
-                if (user) {
-                    updateStmt.run(user, row.id);
-                    updatedCount++;
-                }
-            } catch (e) {
-                console.error(`Failed to parse details for event ${row.id}`, e);
-            }
-        }
+        // Get 5 samples to inspect
+        const samples = db.prepare("SELECT id, event_type, details FROM events WHERE sso_user = 'Unknown' AND details IS NOT NULL LIMIT 5").all();
 
         return NextResponse.json({
-            success: true,
-            message: `Fixed ${updatedCount} records out of ${rows.length} checked.`,
-            updatedCount,
-            totalChecked: rows.length
+            samples: samples.map((s: any) => ({
+                id: s.id,
+                event: s.event_type,
+                details: JSON.parse(s.details)
+            }))
         });
     } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 500 });
