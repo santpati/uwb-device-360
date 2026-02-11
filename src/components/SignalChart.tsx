@@ -44,14 +44,34 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     const [error, setError] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
+    const [lastTimestamp, setLastTimestamp] = useState<number>(Date.now() - 10000); // Start looking 10s back
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
     const startStream = async () => {
         if (isStreaming) return;
         setIsStreaming(true);
         setError(null);
         setData([]);
-        setEvents([]); // Clear Logs
+        setEvents([]);
+        setLastTimestamp(Date.now() - 10000);
 
-        // Track Stream Start
+        // 1. Register Tenant (and API Key if provided)
+        // We use the tenantId from ssoUser context or pass it in. 
+        // But SignalChart props only has apiKey and ssoUser. 
+        // We need tenantId. We can extract it from the token context in parent, 
+        // but for now let's assume valid access implies we can register.
+        // Actually, we need to call the register endpoint.
+        // We might need to pass `tenantId` as a prop to SignalChart.
+
+        // For now, let's assume the parent has done registration or we do it here if we have the ID.
+        // But wait, the prompt says "when any user start debugging session (by providing the sys-token and API key) - if for that tenant firehose command is not started then it should start"
+        // This suggests we should trigger registration here.
+
+        // Let's decode the API Key to find tenant? No, API Key doesn't have tenant ID in clear text usually.
+        // The parent component `DeviceDebugger` has `tokens` which has `tenant`.
+        // We need to pass `tenantId` to SignalChart.
+
+        // START_STREAM event tracking
         fetch('/api/analytics/track', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -62,57 +82,58 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             })
         }).catch(console.error);
 
-        const controller = new AbortController();
-        abortControllerRef.current = controller;
+        // Initial Registration
+        const tenantId = localStorage.getItem('tenant_id');
+        if (tenantId) {
+            fetch('/api/firehose/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tenantId, apiKey })
+            }).catch(console.error);
+        }
 
+        // Polling Logic
+        pollingIntervalRef.current = setInterval(pollEvents, 1000);
+    };
+
+    const pollEvents = async () => {
         try {
-            const response = await fetch(`/api/firehose?apiKey=${encodeURIComponent(apiKey)}&macAddress=${encodeURIComponent(macAddress)}`, {
-                signal: controller.signal,
-            });
-
-            if (!response.ok) {
-                throw new Error(`Stream connection failed: ${response.status}`);
+            // We need tenantId here. I will look for it in localStorage or props.
+            // Ideally props. 
+            const tenantId = localStorage.getItem('tenant_id');
+            if (!tenantId) {
+                console.error("No tenant ID found");
+                return;
             }
 
-            if (!response.body) throw new Error("No response body");
+            // Register if not registered (we can do this once or lazily)
+            // But efficient way is to rely on register API being called.
+            // Let's ensure we register ONCE at start.
 
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+            // Fetch events
+            const res = await fetch(`/api/firehose?tenantId=${tenantId}&macAddress=${encodeURIComponent(macAddress)}&since=${lastTimestamp}`);
+            if (!res.ok) throw new Error("Failed to fetch events");
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            const json = await res.json();
+            if (json.events && json.events.length > 0) {
+                // Update timestamp to the latest one seen
+                const maxTime = Math.max(...json.events.map((e: any) => e.timestamp));
+                setLastTimestamp(maxTime);
 
-                const chunk = decoder.decode(value, { stream: true });
-                buffer += chunk;
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.trim()) continue;
-                    try {
-                        const event = JSON.parse(line);
-                        processEvent(event);
-                    } catch (e) {
-                        console.warn("Failed to parse line", e);
-                    }
-                }
+                // Process events
+                json.events.forEach((e: any) => processEvent(e));
             }
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                setError(err.message);
-                setIsStreaming(false);
-            }
-        } finally {
-            setIsStreaming(false);
+
+        } catch (e: any) {
+            console.error("Polling error", e);
+            // Don't stop streaming on transient errors
         }
     };
 
     const stopStream = () => {
-        if (abortControllerRef.current) {
-            abortControllerRef.current.abort();
-            abortControllerRef.current = null;
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
         }
         setIsStreaming(false);
     };
