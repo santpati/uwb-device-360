@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Default: Last 10 seconds if no 'since' provided, to avoid huge payloads on initial load
-    const minTimestamp = since ? parseInt(since) : Date.now() - 10000;
+    // Default: Last 10 seconds if no 'since' provided. Handle 0 explicitly.
+    const minTimestamp = (since !== null && since !== undefined) ? parseInt(since) : Date.now() - 10000;
 
     try {
         let events;
