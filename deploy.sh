@@ -30,10 +30,16 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
         sudo npm install -g pm2
     fi
 
-    # Check for Directory
+    # Check for Directory & Backup
     if [ -d "$REMOTE_DIR" ]; then
+        echo "💾 Creating Remote Backup..."
+        BACKUP_NAME="${REMOTE_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+        cp -r $REMOTE_DIR $BACKUP_NAME
+        echo "✅ Backup created: $BACKUP_NAME"
+
         echo "🔄 Pulling latest changes..."
         cd $REMOTE_DIR
+        git reset --hard
         git pull origin main
     else
         echo "📥 Cloning repository..."
@@ -49,7 +55,6 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
     npm run build
 
     # Start/Restart Application
-    # Start/Restart Application
     echo "🚀 (Re)Starting application in Cluster Mode..."
     pm2 delete "uwb-device-360" 2> /dev/null || true
     pm2 start ecosystem.config.js
@@ -59,6 +64,12 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
     chmod +x monitor_system.sh
     pm2 delete "system-monitor" 2> /dev/null || true
     pm2 start ./monitor_system.sh --name "system-monitor"
+
+    # Start/Restart CiscoLive Worker
+    echo "👷 Starting CiscoLive Worker..."
+    pm2 delete "ciscolive-worker" 2> /dev/null || true
+    # Use npx tsx to run the typescript file directly
+    pm2 start "npx tsx scripts/ciscolive_worker.ts" --name "ciscolive-worker"
 
     pm2 save
 
