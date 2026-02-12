@@ -20,6 +20,7 @@ interface DeviceInfo {
     serialNumber?: string;
     productId?: string;
     vendor?: string;
+    locationText?: string;
 }
 
 interface LocationInfo {
@@ -204,13 +205,14 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
 
             let mergedDevice: DeviceInfo = { macAddress: cleanMac };
             let mergedLocation: LocationInfo | null = null;
-            let statusRes = null;
 
             // Determine which status request succeeded
-            if (statusRes1 && Array.isArray(statusRes1) && statusRes1.length > 0) {
-                statusRes = statusRes1;
-            } else if (statusRes2 && Array.isArray(statusRes2) && statusRes2.length > 0) {
-                statusRes = statusRes2;
+            // API returns { beacons: [...] }
+            let statusBeacons: any[] = [];
+            if (statusRes1 && statusRes1.beacons && Array.isArray(statusRes1.beacons)) {
+                statusBeacons = statusRes1.beacons;
+            } else if (statusRes2 && statusRes2.beacons && Array.isArray(statusRes2.beacons)) {
+                statusBeacons = statusRes2.beacons;
             }
 
             // Process Claimed Info
@@ -252,26 +254,35 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                 }
             }
 
-            // Process Beacon/Floor Info (Overrides with fresher data)
-            if (statusRes && Array.isArray(statusRes) && statusRes.length > 0) {
-                // API returns array of matches
-                const status = statusRes[0];
+            // Process Beacon/Floor Info (Rich Data)
+            if (statusBeacons.length > 0) {
+                const status = statusBeacons[0];
                 if (status) {
-                    // Update Device Info
-                    // Note: batteryLevel can be 0, so use nullish coalescing carefully
-                    // If status.batteryLevel is defined (even 0), usage it.
-                    if (status.batteryLevel !== undefined && status.batteryLevel !== null) {
+                    // Update Device Info with FRESHER data from beacon API
+                    // Check 'battery' (user confirmed) or 'batteryLevel'
+                    if (status.battery !== undefined && status.battery !== null) {
+                        mergedDevice.batteryStatus = status.battery;
+                    } else if (status.batteryLevel !== undefined && status.batteryLevel !== null) {
                         mergedDevice.batteryStatus = status.batteryLevel;
                     }
 
-                    mergedDevice.lastSeenTime = status.lastLocatedTime ?? status.lastSeen ?? mergedDevice.lastSeenTime;
+                    mergedDevice.lastSeenTime = status.lastLocatedTime ?? status.lastseen ?? status.lastSeen ?? mergedDevice.lastSeenTime;
+                    mergedDevice.firmwareVersion = status.firmware || mergedDevice.firmwareVersion;
+
+                    // Add Location Text if available
+                    if (status.location) {
+                        mergedDevice.locationText = status.location;
+                    }
 
                     if (status.deviceProfile) {
                         mergedDevice.model = status.deviceProfile.model || mergedDevice.model;
                         mergedDevice.vendor = status.deviceProfile.vendor || mergedDevice.vendor;
+                    } else if (status.profile) {
+                        // Fallback for profile string
+                        mergedDevice.vendor = status.profile;
                     }
 
-                    // Update Location Info
+                    // Update Location Info (Geo)
                     if (status.geoCoordinates) {
                         mergedLocation = {
                             latitude: status.geoCoordinates[0],
@@ -279,19 +290,13 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                             computeType: status.computeType || 'Unknown',
                             lastLocatedTime: status.lastLocatedTime
                         };
-                    } else if (status.location && status.location.x && status.location.y) {
-                        // If we only have X/Y but not Lat/Long, use X/Y as lat/long placeholder if needed
-                        // but for map we need lat/long. 
-                        // We can store it in locationData anyway for display text
-                        // But LocationInfo interface expects lat/long numbers.
-                        // Let's check computeType.
                     }
                 }
             }
 
             // Only update state if we found *something*
-            // If we have a location OR a model OR it was found in claimed list
-            if (mergedDevice.model || mergedLocation || mergedDevice.createTime) {
+            // If we have a location OR a model OR it was found in claimed list OR battery status is known
+            if (mergedDevice.model || mergedLocation || mergedDevice.createTime || mergedDevice.batteryStatus !== undefined) {
                 setDeviceData(mergedDevice as DeviceInfo);
                 setLocationData(mergedLocation);
             } else {
@@ -304,8 +309,8 @@ Device not found.
 Debug Info:
 - Claimed API: Success (Scanned ${claimedRes?.devices?.length || 0} recent devices)
 - First Device Keys: ${firstDeviceKeys || 'N/A'}
-- Floor API (Mac formatted): ${statusRes1?.length ? 'Match Found' : 'No Match'}
-- Floor API (Raw): ${statusRes2?.length ? 'Match Found' : 'No Match'}
+- Floor API (Mac formatted): ${statusRes1?.beacons?.length ? 'Match Found' : 'No Match'}
+- Floor API (Raw): ${statusRes2?.beacons?.length ? 'Match Found' : 'No Match'}
 
 Tips:
 - The device might not be in the "recent 100" list.
@@ -462,8 +467,8 @@ Tips:
                                 </div>
                                 <div>
                                     <span className="block text-zinc-500 text-xs uppercase tracking-wider">Last Location</span>
-                                    <span className="text-zinc-300 block mt-1 text-sm truncate">
-                                        {locationData ? `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}` : 'Unknown'}
+                                    <span className="text-zinc-300 block mt-1 text-sm truncate" title={deviceData.locationText || ''}>
+                                        {locationData ? `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}` : (deviceData.locationText || 'Unknown')}
                                     </span>
                                 </div>
                             </div>
