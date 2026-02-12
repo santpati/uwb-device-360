@@ -25,13 +25,7 @@ async function fetchInitialDevices() {
 function startFirehose() {
     console.log("Starting Firehose Stream...");
 
-    // Command: curl -vvv "..." | grep -i "IOT_UWB_TAG"
-    const curl = spawn('curl', [
-        '-N', // No buffer
-        '-s', // Silent (we'll capture filtered output)
-        'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
-        '-H', `X-API-Key:${FIREHOSE_API_KEY}`
-    ]);
+
 
     // Command: curl -vvv "..." -H "..."
     // We pipe directly to Node to avoid grep buffering/filtering issues
