@@ -292,6 +292,22 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
         // Prepend to keep latest on top
         setEvents(prev => [newLog, ...prev]);
+
+        // INTEG: CiscoLive Integration
+        // If current tenant is '23285', forward event to CiscoLive stats
+        const currentTenant = localStorage.getItem('tenant_id')?.replace(/['"]+/g, '');
+        if (currentTenant === '23285' || window.location.host.includes('ciscolive')) {
+            fetch('/api/ciscolive/data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'recordEvent',
+                    mac: macAddress,
+                    type, // 'UWB_TDOA' | 'BLE_RSSI'
+                    timestamp
+                })
+            }).catch(err => console.error("Failed to forward event to CiscoLive DB", err));
+        }
     };
 
     const downloadLogs = () => {

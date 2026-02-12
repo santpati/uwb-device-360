@@ -61,6 +61,23 @@ export async function POST(req: NextRequest) {
                 transaction(payload);
                 return NextResponse.json({ success: true, count: payload.length });
             }
+        } else if (action === 'recordEvent') {
+            // payload in body: mac, type, timestamp
+            const { mac, type, timestamp } = body;
+            const dbType = (type === 'UWB_TDOA' || type === 'UWB') ? 'UWB' : 'BLE';
+
+            // Increment Stat
+            const { incrementStat, upsertDevice } = require('@/lib/ciscolive_db');
+            incrementStat(mac, dbType, timestamp || Date.now());
+
+            // Also ensure device exists / update lastSeen
+            upsertDevice({
+                mac,
+                lastSeen: new Date(timestamp || Date.now()).toISOString(),
+                status: 'Active' // Mark active if we see events
+            });
+
+            return NextResponse.json({ success: true });
         }
 
         return NextResponse.json({ success: true });
