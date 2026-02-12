@@ -12,10 +12,11 @@ const FIREHOSE_API_KEY = "B3DB01B8C4B64856BE66CB862FF84F57";
 
 function startFirehose() {
     console.log("Starting Firehose Stream with GREP filter...");
-    console.log(`Command: curl ... | grep -i "IOT_UWB_TAG"`);
+    console.log(`Command: curl ... | grep -i "IOT_TELEMETRY"`);
 
     // 1. Spawn GREP first
-    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_UWB_TAG'], {
+    // User requested change from IOT_UWB_TAG to IOT_TELEMETRY
+    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_TELEMETRY'], {
         stdio: ['pipe', 'pipe', 'pipe']
     });
 
