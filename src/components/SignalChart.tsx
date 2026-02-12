@@ -42,6 +42,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     const [events, setEvents] = useState<EventLog[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [debugInfo, setDebugInfo] = useState<string>('Initializing...');
     const abortControllerRef = useRef<AbortController | null>(null);
 
     // Start looking from 0 (beginning of time) to catch latest history on load, since API now returns latest 500 DESC
@@ -138,12 +139,19 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             // console.log("Fetching", url);
 
             const res = await fetch(url, { cache: 'no-store' });
+
             if (!res.ok) {
                 const text = await res.text();
+                setDebugInfo(`Fetch Failed: ${res.status} ${text} (URL: ${url})`);
                 throw new Error(`API Error ${res.status}: ${text}`);
             }
 
             const json = await res.json();
+
+            const eventCount = json.events ? json.events.length : 0;
+            const firstEventSnippet = eventCount > 0 ? JSON.stringify(json.events[0], null, 2).slice(0, 200) + "..." : "No events";
+
+            setDebugInfo(`Success: Fetched ${eventCount} events. URL: ${url} \nFirst Event: ${firstEventSnippet}`);
 
             // Log fetch result if empty (to diagnose "No Signal")
             if (!json.events || json.events.length === 0) {
@@ -427,7 +435,12 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
                         </tbody>
                     </table>
                 </div>
+                {/* DEBUG PANEL */}
+                <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 text-[10px] font-mono text-zinc-400 overflow-x-auto mt-6">
+                    <h4 className="text-orange-500 font-bold mb-2">DEBUG INFO</h4>
+                    <pre className="whitespace-pre-wrap srollbar-thin scrollbar-thumb-zinc-700">{debugInfo}</pre>
+                </div>
+
             </div>
-        </div>
-    );
+            );
 }
