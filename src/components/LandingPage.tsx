@@ -386,3 +386,81 @@ export default function LandingPage({ onSave }: LandingPageProps) {
         </div>
     );
 }
+
+// Subcomponent for Firehose Key to handle its own auto-fetch logic
+function FirehoseKeyInput({ tenantId, value, onChange }: { tenantId: string, value: string, onChange: (v: string) => void }) {
+    const [autoPopulated, setAutoPopulated] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (!tenantId) return;
+
+        const fetchKey = async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/firehose/config?tenantId=${tenantId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.found && data.apiKey) {
+                        onChange(data.apiKey);
+                        setAutoPopulated(true);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to auto-fetch key", e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchKey();
+    }, [tenantId]);
+
+    return (
+        <div className="space-y-3 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                    <Radio className="w-3 h-3" />
+                    Firehose API Key <span className="text-zinc-600 normal-case ml-1 tracking-normal">(Optional)</span>
+                </label>
+
+                {autoPopulated && (
+                    <span className="text-[10px] text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <Sparkles className="w-3 h-3" />
+                        Auto-Populated from Server
+                    </span>
+                )}
+            </div>
+
+            <div className="relative">
+                <input
+                    type="password"
+                    value={value}
+                    onChange={(e) => {
+                        onChange(e.target.value);
+                        setAutoPopulated(false);
+                    }}
+                    className={`w-full bg-zinc-950/80 border rounded-xl px-4 py-3 text-sm text-white focus:ring-2 outline-none transition-all placeholder:text-zinc-700 font-mono
+                        ${autoPopulated
+                            ? 'border-emerald-500/30 focus:border-emerald-500/50 focus:ring-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                            : 'border-zinc-800 focus:border-indigo-500/50 focus:ring-indigo-500/50'
+                        }
+                    `}
+                    placeholder="X-API-Key"
+                />
+
+                {loading && (
+                    <div className="absolute right-3 top-3.5">
+                        <div className="w-4 h-4 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin"></div>
+                    </div>
+                )}
+            </div>
+
+            {autoPopulated && (
+                <p className="text-[10px] text-zinc-500">
+                    We found an existing key for this tenant in the database.
+                </p>
+            )}
+        </div>
+    );
+}
