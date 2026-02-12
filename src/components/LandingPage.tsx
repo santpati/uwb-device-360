@@ -257,46 +257,23 @@ export default function LandingPage({ onSave }: LandingPageProps) {
                         )}
 
                         {/* Firehose API Key */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                                    <Radio className="w-3 h-3" />
-                                    Firehose API Key <span className="text-zinc-600 normal-case ml-1 tracking-normal">(Optional)</span>
-                                </label>
-
-                                {/* Cisco Live EU Toggle */}
-                                <label className="flex items-center gap-2 cursor-pointer group">
-                                    <input
-                                        type="checkbox"
-                                        className="peer sr-only"
-                                        onChange={(e) => {
-                                            if (e.target.checked) {
-                                                const keys = [
-                                                    "B3DB01B8C4B64856BE66CB862FF84F57",
-                                                    "62C0ABE8D7C84DB58C1B8EA9805D2CE0",
-                                                    "EA39257AB6CF41FDBA265C97FCF9A95D"
-                                                ];
-                                                const randomKey = keys[Math.floor(Math.random() * keys.length)];
-                                                setFirehoseApiKey(randomKey);
-                                            } else {
-                                                setFirehoseApiKey("");
-                                            }
-                                        }}
-                                    />
-                                    <div className="w-8 h-4 bg-zinc-800 rounded-full peer-checked:bg-indigo-600 transition-colors relative">
-                                        <div className="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
-                                    </div>
-                                    <span className="text-[10px] text-zinc-500 group-hover:text-indigo-400 transition-colors font-medium">Use Cisco Live EU</span>
-                                </label>
-                            </div>
-                            <input
-                                type="password"
+                        {decodedData?.tenantId ? (
+                            <FirehoseKeyInput
+                                tenantId={String(decodedData.tenantId)}
                                 value={firehoseApiKey}
-                                onChange={(e) => setFirehoseApiKey(e.target.value)}
-                                className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 outline-none transition-all placeholder:text-zinc-700 font-mono"
-                                placeholder="X-API-Key for Firehose Streaming"
+                                onChange={setFirehoseApiKey}
                             />
-                        </div>
+                        ) : (
+                            <div className="opacity-50 pointer-events-none filter blur-[1px] transition-all">
+                                <div className="space-y-3">
+                                    <label className="text-xs font-medium text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                                        <Radio className="w-3 h-3" />
+                                        Firehose API Key <span className="text-zinc-600 normal-case ml-1 tracking-normal">(Enter Tenant first)</span>
+                                    </label>
+                                    <input disabled className="w-full bg-zinc-950/80 border border-zinc-800 rounded-xl px-4 py-3 text-sm" placeholder="Locked" />
+                                </div>
+                            </div>
+                        )}
 
                         {error && <p className="text-red-400 text-xs bg-red-500/10 p-3 rounded-lg border border-red-500/20">{error}</p>}
 
