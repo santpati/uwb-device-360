@@ -33,33 +33,54 @@ function startFirehose() {
         '-H', `X-API-Key:${FIREHOSE_API_KEY}`
     ]);
 
-    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_UWB_TAG']);
+    // Command: curl -vvv "..." -H "..."
+    // We pipe directly to Node to avoid grep buffering/filtering issues
+    // and to handle IOT_TELEMETRY vs IOT_UWB_TAG logic in code.
+    const curl = spawn('curl', [
+        '-N', // No buffer
+        '-s', // Silent (we'll capture filtered output)
+        'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
+        '-H', `X-API-Key:${FIREHOSE_API_KEY}`
+    ]);
 
-    curl.stdout.pipe(grep.stdin);
-    curl.stderr.on('data', (data) => console.error(`CURL ERR: ${data}`)); // To see connection issues
+    // Buffer for partial lines
+    let buffer = '';
 
-    grep.stdout.on('data', (data) => {
-        const lines = data.toString().split('\n');
+    curl.stdout.on('data', (data: any) => {
+        buffer += data.toString();
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep last incomplete line
+
         lines.forEach((line: string) => {
-            if (!line) return;
+            if (!line.trim()) return;
             try {
                 if (line.startsWith('data: ')) {
                     const jsonStr = line.replace('data: ', '');
                     try {
                         const event = JSON.parse(jsonStr);
-                        // console.log(`[Firehose] Received event: ${event.eventType}`); // Log every event type
                         processEvent(event);
                     } catch (e) {
-                        console.error("Error parsing event JSON", e);
+                        // console.error("Error parsing event JSON", e);
                     }
+                } else if (line.startsWith(':')) {
+                    // Keep-alive
+                } else {
+                    // Try parsing raw line just in case (some streams differ)
+                    // But usually Firehose matches data: prefix
                 }
             } catch (e) {
-                // ignore parse errors for partial lines
+                // ignore
             }
         });
     });
 
-    grep.stderr.on('data', (data) => console.error(`GREP ERR: ${data}`));
+    curl.stderr.on('data', (data) => {
+        const msg = data.toString();
+        // Ignore verbose info, log errors
+        if (msg.toLowerCase().includes('error') || msg.toLowerCase().includes('fail')) {
+            console.error(`CURL ERR: ${msg}`);
+        }
+    });
 
     curl.on('close', (code) => {
         console.log(`Firehose connection closed (code ${code}). Restarting in 5s...`);
