@@ -1,9 +1,49 @@
+import { useState, useEffect } from "react";
+import { Search, MapPin, Wifi, Box, History as HistoryIcon, Activity, Radio, CheckCircle2 } from "lucide-react";
+import confetti from 'canvas-confetti';
+import { fetchProxy } from "@/lib/api";
+import SignalChart from "@/components/SignalChart";
+import DeviceLifecycle from "@/components/DeviceLifecycle";
 import BatteryLevel from "@/components/BatteryLevel";
 import LocationMap from "@/components/LocationMap";
 
-// ... (Imports remain the same, ensuring BatteryLevel and LocationMap are imported)
+interface DeviceInfo {
+    macAddress: string;
+    name?: string;
+    createTime?: string;
+    lastSeenTime?: string;
+    batteryStatus?: string | number;
+    firmwareVersion?: string;
+    claimed?: boolean;
+    model?: string;
+    make?: string;
+    serialNumber?: string;
+    productId?: string;
+    vendor?: string;
+}
 
-// ... (Interfaces)
+interface LocationInfo {
+    latitude: number;
+    longitude: number;
+    computeType?: string;
+    lastLocatedTime?: number;
+}
+
+interface Tokens {
+    sys: string;
+    user: string;
+    tenant: string;
+    firehoseApiKey?: string;
+    ssoUser?: string;
+    exp?: number;
+}
+
+interface DeviceDebuggerProps {
+    tokens: Tokens;
+    initialMac?: string;
+    onMacUpdate?: (mac: string) => void;
+    isActive: boolean;
+}
 
 export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, isActive }: DeviceDebuggerProps) {
     // ... (State)
