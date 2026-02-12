@@ -259,14 +259,26 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
             }
 
             // Only update state if we found *something*
-            // If we have a location OR a model OR it was found in claimed list
             if (mergedDevice.model || mergedLocation || mergedDevice.createTime) {
                 setDeviceData(mergedDevice as DeviceInfo);
                 setLocationData(mergedLocation);
             } else {
                 setDeviceData(null);
                 setLocationData(null);
-                alert("Device not found. \n\nTips:\n- Ensure the device is claimed or active.\n- Try checking the MAC address format.");
+
+                const debugMsg = `
+Device not found.
+
+Debug Info:
+- Claimed API: Success (Scanned ${claimedRes?.devices?.length || 0} recent devices)
+- Floor API (Mac formatted): ${statusRes1?.length ? 'Match Found' : 'No Match'}
+- Floor API (Raw): ${statusRes2?.length ? 'Match Found' : 'No Match'}
+
+Tips:
+- Ensure the device is claimed or active.
+- Try checking the MAC address format.
+                `;
+                alert(debugMsg.trim());
             }
 
         } catch (e: any) {
