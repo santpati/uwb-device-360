@@ -84,6 +84,9 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
     const startStream = async () => {
         if (isStreamingRef.current) return; // Use ref for latest streaming status
+
+        // Manual updates to ensure immediate availability for polling loop
+        isStreamingRef.current = true;
         setIsStreaming(true);
         setError(null);
         setData([]);
@@ -102,7 +105,9 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         }).catch(console.error);
 
         // Initial Registration (Idempotent)
-        const tenantId = localStorage.getItem('tenant_id');
+        const rawTenant = localStorage.getItem('tenant_id') || '';
+        const tenantId = rawTenant.trim().replace(/['"]+/g, '');
+
         if (tenantId) {
             fetch('/api/firehose/register', {
                 method: 'POST',
