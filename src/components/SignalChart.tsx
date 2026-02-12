@@ -35,9 +35,10 @@ interface SignalChartProps {
     apiKey: string;
     ssoUser?: string;
     onSignalDetected?: (type: 'BLE' | 'UWB') => void;
+    onEvent?: (event: any) => void;
 }
 
-export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetected }: SignalChartProps) {
+export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetected, onEvent }: SignalChartProps) {
     const [data, setData] = useState<SignalPoint[]>([]);
     const [events, setEvents] = useState<EventLog[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
@@ -191,6 +192,15 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     };
 
     const processEvent = (event: any) => {
+        // Bubble up raw event to parent (for Map/Battery updates)
+        if (onEvent) {
+            try {
+                onEvent(event);
+            } catch (e) {
+                console.error("Error in onEvent handler", e);
+            }
+        }
+
         // Use the timestamp from the API event container
         const timestamp = event.timestamp || Date.now();
         const timeLabel = new Date(timestamp).toLocaleTimeString();
