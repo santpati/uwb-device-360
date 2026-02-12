@@ -47,9 +47,9 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
     // Start looking from 0 (beginning of time) to catch latest history on load, since API now returns latest 500 DESC
     const [lastTimestamp, setLastTimestamp] = useState<number>(0);
-    const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const eventSourceRef = useRef<EventSource | null>(null);
 
-    // Refs for stable access to state inside recursive polling function
+    // Refs for stable access to state inside event handlers
     const lastTimestampRef = useRef(lastTimestamp);
     const isStreamingRef = useRef(isStreaming);
 
@@ -65,7 +65,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
     useEffect(() => {
         const checkStatus = async () => {
             const tenantId = localStorage.getItem('tenant_id');
-            if (!tenantId || isStreamingRef.current) return; // Use ref for latest streaming status
+            if (!tenantId || isStreamingRef.current) return;
 
             try {
                 const res = await fetch(`/api/firehose/status?tenantId=${tenantId}`);
@@ -80,18 +80,19 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
         checkStatus();
         return () => stopStream(); // Cleanup on unmount
-    }, []); // Empty dependency array means this runs once on mount
+    }, []);
 
     const startStream = async () => {
-        if (isStreamingRef.current) return; // Use ref for latest streaming status
+        if (isStreamingRef.current) return;
 
-        // Manual updates to ensure immediate availability for polling loop
+        // Manual updates to ensure immediate availability
         isStreamingRef.current = true;
         setIsStreaming(true);
         setError(null);
         setData([]);
         setEvents([]);
         setLastTimestamp(0);
+        setDebugInfo('Initializing Event Stream...');
 
         // START_STREAM event tracking
         fetch('/api/analytics/track', {
@@ -116,87 +117,77 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             }).catch(console.error);
         }
 
-        // Start Polling Loop
-        pollEvents();
+        // Initialize SSE Connection
+        initEventSource(tenantId);
     };
 
-    // Redefine pollEvents to be stable and use Refs for state that changes
-    const pollEvents = async () => {
-        if (!isStreamingRef.current) return;
-
-        try {
-            const rawTenant = localStorage.getItem('tenant_id') || '';
-            const tenantId = rawTenant.trim().replace(/['"]+/g, ''); // Remove whitespace and quotes
-
-            if (!tenantId) {
-                const msg = "Missing Tenant ID. Please configure setup.";
-                setError(msg);
-                setDebugInfo(`Error: ${msg}`);
-                setIsStreaming(false);
-                return;
-            }
-
-            const since = lastTimestampRef.current;
-            const cleanMac = macAddress.trim().replace(/:/g, '').toLowerCase();
-
-            // 1. Add timestamp to URL to prevent browser caching
-            // 2. Add 'no-store' to headers
-            const url = `/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}&_t=${Date.now()}`;
-
-            // DEBUG LOG (Verbose)
-            // console.log("Fetching", url);
-
-            const res = await fetch(url, { cache: 'no-store' });
-
-            if (!res.ok) {
-                const text = await res.text();
-                setDebugInfo(`Fetch Failed: ${res.status} ${text} \nURL: ${url}`);
-                throw new Error(`API Error ${res.status}: ${text}`);
-            }
-
-            const json = await res.json();
-
-            const eventCount = json.events ? json.events.length : 0;
-            const firstEventSnippet = eventCount > 0 ? JSON.stringify(json.events[0], null, 2).slice(0, 200) + "..." : "No events";
-
-            setDebugInfo(`Success (${res.status}): Fetched ${eventCount} events.\nTenant: '${tenantId}' \nMAC: '${cleanMac}' \nSince: ${since} \nURL: ${url} \nFirst Event: ${firstEventSnippet}`);
-
-            // Log fetch result if empty (to diagnose "No Signal")
-            if (!json.events || json.events.length === 0) {
-                if (events.length === 0) {
-                    // Only log "No data" if we have NOTHING shown yet, so user knows we tried.
-                    // But don't spam it every second.
-                    // We can use a ref to track if we've warned about empty data
-                }
-            }
-
-            if (json.events && json.events.length > 0) {
-                const maxTime = Math.max(...json.events.map((e: any) => e.timestamp));
-                setLastTimestamp(maxTime); // This updates Ref via effect
-
-                // Process events
-                json.events.forEach((e: any) => processEvent(e));
-            }
-
-        } catch (e: any) {
-            console.error("Polling error", e);
-            setError(e.message);
-            setEvents(prev => [{ id: Date.now(), type: 'ERROR', timestamp: new Date().toISOString(), details: { error: e.message } }, ...prev]);
-            setIsStreaming(false); // Stop on error to prevent loop spam
-        } finally {
-            // Schedule next poll if still streaming and no critical error stopped it
-            if (isStreamingRef.current) {
-                pollingTimeoutRef.current = setTimeout(pollEvents, 1000);
-            }
+    const initEventSource = (tenantId: string) => {
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
         }
+
+        const cleanMac = macAddress.trim().replace(/:/g, '').toLowerCase();
+        // Since=0 initial load, then updates are handled by server pushing new data
+        // Ideally pass lastTimestamp if re-connecting, but for now 0 is safer for full freshview
+        const since = lastTimestampRef.current || 0;
+
+        const url = `/api/firehose/stream?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}`;
+
+        const es = new EventSource(url);
+        eventSourceRef.current = es;
+
+        es.onopen = () => {
+            setDebugInfo(prev => `SSE Connected: ${url}\n${prev}`);
+        };
+
+        es.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'connected') {
+                    setDebugInfo(prev => `Stream Active. Server Time: ${new Date(data.timestamp).toLocaleTimeString()}`);
+                } else if (data.type === 'update') {
+                    const newEvents = data.events || [];
+                    if (newEvents.length > 0) {
+                        const eventCount = newEvents.length;
+                        const firstEventSnippet = JSON.stringify(newEvents[0], null, 2).slice(0, 50) + "...";
+                        setDebugInfo(`Recv ${eventCount} events. Last: ${firstEventSnippet}`);
+
+                        // Update Max Timestamp
+                        const maxTime = Math.max(...newEvents.map((e: any) => e.timestamp));
+                        setLastTimestamp(prev => Math.max(prev, maxTime));
+
+                        // Process
+                        newEvents.forEach((e: any) => processEvent(e));
+                    }
+                } else if (data.type === 'heartbeat') {
+                    // Keep-alive, do nothing or update UI badge
+                } else if (data.type === 'error') {
+                    setError(data.message);
+                }
+            } catch (e) {
+                console.error("SSE Parse Error", e);
+            }
+        };
+
+        es.onerror = (err) => {
+            console.error("SSE Error", err);
+            // EventSource auto-reconnects, but we log it
+            // If explicit close requested, we don't worry.
+            if (isStreamingRef.current) {
+                setDebugInfo("Stream disconnected. Auto-reconnecting...");
+            }
+        };
     };
 
     const stopStream = () => {
-        if (pollingTimeoutRef.current) {
-            clearTimeout(pollingTimeoutRef.current);
-            pollingTimeoutRef.current = null;
+        if (eventSourceRef.current) {
+            eventSourceRef.current.close();
+            eventSourceRef.current = null;
         }
         setIsStreaming(false);
+        isStreamingRef.current = false;
+        setDebugInfo("Stream Stopped.");
     };
 
     const processEvent = (event: any) => {
