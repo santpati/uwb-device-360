@@ -124,6 +124,29 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                         TARGET_MODELS.includes(d.model?.toUpperCase())
                     );
                     setClaimedDevices(filtered);
+
+                    // --- Special Tenant Sync Logic (Portable) ---
+                    // Config: Tenant ID -> Sync Endpoint
+                    const SPECIAL_TENANTS: Record<string, string> = {
+                        '23285': '/api/ciscolive/data'
+                    };
+
+                    const currentTenantId = tokens.tenant ? String(tokens.tenant) : '';
+                    const syncEndpoint = SPECIAL_TENANTS[currentTenantId];
+
+                    if (syncEndpoint && filtered.length > 0) {
+                        console.log(`[Special Tenant] Syncing ${filtered.length} devices to ${syncEndpoint}...`);
+                        // Fire and forget sync
+                        fetch(syncEndpoint, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                action: 'syncDevices',
+                                payload: filtered
+                            })
+                        }).catch(e => console.error("[Special Tenant] Sync failed", e));
+                    }
+                    // --------------------------------------------
                 }
             } catch (e) {
                 console.error("Failed to load claimed devices", e);
