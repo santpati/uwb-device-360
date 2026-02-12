@@ -72,7 +72,7 @@ export const incrementStat = (mac: string, type: 'BLE' | 'UWB', timestamp: numbe
 
 export const getAllData = () => {
     const devices = db.prepare('SELECT * FROM devices ORDER BY layoutIndex ASC').all();
-    const stats = db.prepare('SELECT * FROM stats WHERE hour >= datetime("now", "-24 hours")').all();
+    const stats = db.prepare("SELECT * FROM stats WHERE hour >= datetime('now', '-24 hours')").all();
 
     // Merge stats into devices? Or return separate? Return separate for easier graph building.
     return { devices, stats };
