@@ -46,7 +46,34 @@ interface DeviceDebuggerProps {
 }
 
 export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, isActive }: DeviceDebuggerProps) {
-    // ... (State)
+    // State
+    const [deviceMac, setDeviceMac] = useState(initialMac);
+    const [signalsDetected, setSignalsDetected] = useState({ ble: false, uwb: false });
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [showRecent, setShowRecent] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [deviceData, setDeviceData] = useState<DeviceInfo | null>(null);
+    const [locationData, setLocationData] = useState<LocationInfo | null>(null);
+    const [claimedDevices, setClaimedDevices] = useState<any[]>([]);
+
+    const handleSignalDetected = (type: 'BLE' | 'UWB') => {
+        setSignalsDetected(prev => {
+            if (type === 'UWB' && !prev.uwb) {
+                // Trigger Confetti on First UWB Pulse
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#10b981', '#34d399', '#059669', '#ffffff'] // Green/White theme
+                });
+                return { ...prev, uwb: true };
+            }
+            if (type === 'BLE' && !prev.ble) {
+                return { ...prev, ble: true };
+            }
+            return prev;
+        });
+    };
 
     const handleRealtimeEvent = (event: any) => {
         // 1. Update Location
@@ -77,111 +104,56 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
         }
     };
 
-    // ... (handleSignalDetected, etc.)
+    // Fetch Claimed Devices on Mount
+    useEffect(() => {
+        const fetchDevices = async () => {
+            if (!tokens?.sys) return;
 
-    const handleSearch = async () => {
-        if (!tokens || !deviceMac) return;
-        setIsLoading(true);
-        // Don't clear immediately to avoid flickering if we are just refreshing
-        // setDeviceData(null); 
-        // setLocationData(null);
+            try {
+                const res = await fetchProxy<any>({
+                    targetUrl: `https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=100&sortBy=create_time&sortType=DESCENDING`,
+                    sysToken: tokens.sys,
+                    userAccessToken: tokens.user || ""
+                });
 
-        if (onMacUpdate) onMacUpdate(deviceMac);
-        const cleanMac = deviceMac.trim();
-
-        try {
-            // 1. Fetch Claimed Device Info (Metadata)
-            const claimedPromise = fetchProxy<any>({
-                targetUrl: `https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=100&sortBy=create_time&sortType=DESCENDING`,
-                sysToken: tokens.sys,
-                userAccessToken: tokens.user
-            });
-
-            // 2. Fetch Beacon/Floor Info (Rich Status: Battery, Location)
-            const encodedMac = encodeURIComponent(cleanMac);
-            const statusPromise = fetchProxy<any>({
-                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodedMac}`,
-                sysToken: tokens.sys,
-                userAccessToken: tokens.user
-            });
-
-            const [claimedRes, statusRes] = await Promise.all([claimedPromise, statusPromise]);
-
-            let mergedDevice: DeviceInfo = { macAddress: cleanMac };
-            let mergedLocation: LocationInfo | null = null;
-
-            // Process Claimed Info
-            if (claimedRes && claimedRes.devices) {
-                const found = claimedRes.devices.find((d: any) =>
-                    d.macAddress?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, "")) ||
-                    d.mac?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, ""))
-                );
-                if (found) {
-                    saveToHistory(found.macAddress || found.mac || cleanMac);
-                    mergedDevice = {
-                        ...mergedDevice,
-                        macAddress: found.macAddress || found.mac,
-                        name: found.name,
-                        createTime: found.create_time,
-                        lastSeenTime: found.lastseen,
-                        batteryStatus: found.batteryLevel, // Fallback
-                        firmwareVersion: found.firmware,
-                        claimed: true,
-                        model: found.model,
-                        make: found.make,
-                        serialNumber: found.serial_number,
-                        vendor: found.vendor
-                    };
+                if (res && res.devices) {
+                    const TARGET_MODELS = ['QORVO-UWB', 'SPACES-CT-UB'];
+                    const filtered = res.devices.filter((d: any) =>
+                        TARGET_MODELS.some(m => d.model?.toUpperCase().includes(m)) ||
+                        TARGET_MODELS.includes(d.model?.toUpperCase())
+                    );
+                    setClaimedDevices(filtered);
                 }
+            } catch (e) {
+                console.error("Failed to load claimed devices", e);
             }
+        };
 
-            // Process Beacon/Floor Info (Overrides with fresher data)
-            if (statusRes && Array.isArray(statusRes) && statusRes.length > 0) {
-                // API returns array of matches
-                const status = statusRes[0];
-                if (status) {
-                    // Update Device Info
-                    mergedDevice.batteryStatus = status.batteryLevel ?? mergedDevice.batteryStatus;
-                    mergedDevice.lastSeenTime = status.lastLocatedTime ?? status.lastSeen ?? mergedDevice.lastSeenTime;
+        fetchDevices();
+    }, [tokens]);
 
-                    if (status.deviceProfile) {
-                        mergedDevice.model = status.deviceProfile.model || mergedDevice.model;
-                        mergedDevice.vendor = status.deviceProfile.vendor || mergedDevice.vendor;
-                    }
-
-                    // Update Location Info
-                    if (status.geoCoordinates) {
-                        mergedLocation = {
-                            latitude: status.geoCoordinates[0],
-                            longitude: status.geoCoordinates[1],
-                            computeType: status.computeType || 'Unknown',
-                            lastLocatedTime: status.lastLocatedTime
-                        };
-                    } else if (status.location && status.location.x && status.location.y) {
-                        // If we only have X/Y but not Lat/Long, we can't map it easily on Leaflet without a floorplan.
-                        // But usually beacon/floor returns geoCoordinates if the floor is geo-aligned.
-                    }
-                }
+    // Load History
+    useEffect(() => {
+        const stored = localStorage.getItem("mac_history");
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) setRecentSearches(parsed);
+            } catch (e) {
+                console.error("Failed to parse history", e);
             }
-
-            // Only update state if we found *something*
-            if (mergedDevice.model || mergedLocation) {
-                setDeviceData(mergedDevice as DeviceInfo);
-                setLocationData(mergedLocation);
-            } else {
-                setDeviceData(null);
-                setLocationData(null);
-                alert("Device not found.");
-            }
-
-            // ... (Audit Log) ...
-
-        } catch (e: any) {
-            console.error(e);
-            if (e.status === 401) alert("Session Expired");
-        } finally {
-            setIsLoading(false);
         }
+    }, []);
+
+    const saveToHistory = (mac: string) => {
+        if (!mac) return;
+        const normalized = mac.trim();
+        setRecentSearches(prev => {
+            const filtered = prev.filter(item => item.toLowerCase() !== normalized.toLowerCase());
+            const newHistory = [normalized, ...filtered].slice(0, 5);
+            localStorage.setItem("mac_history", JSON.stringify(newHistory));
+            return newHistory;
+        });
     };
 
     // ... (Render)
