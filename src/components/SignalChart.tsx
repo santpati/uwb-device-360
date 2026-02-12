@@ -120,17 +120,20 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
         if (!isStreamingRef.current) return;
 
         try {
-            const tenantId = localStorage.getItem('tenant_id');
+            const rawTenant = localStorage.getItem('tenant_id') || '';
+            const tenantId = rawTenant.trim().replace(/['"]+/g, ''); // Remove whitespace and quotes
+
             if (!tenantId) {
-                const msg = "Missing Tenant ID in LocalStorage. Please re-configure.";
+                const msg = "Missing Tenant ID. Please configure setup.";
                 setError(msg);
-                setEvents(prev => [{ id: Date.now(), type: 'ERROR', timestamp: new Date().toISOString(), details: { error: msg } }, ...prev]);
+                setDebugInfo(`Error: ${msg}`);
                 setIsStreaming(false);
                 return;
             }
 
             const since = lastTimestampRef.current;
-            const cleanMac = macAddress.replace(/:/g, '').toLowerCase();
+            const cleanMac = macAddress.trim().replace(/:/g, '').toLowerCase();
+
             // 1. Add timestamp to URL to prevent browser caching
             // 2. Add 'no-store' to headers
             const url = `/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}&_t=${Date.now()}`;
@@ -142,7 +145,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
             if (!res.ok) {
                 const text = await res.text();
-                setDebugInfo(`Fetch Failed: ${res.status} ${text} (URL: ${url})`);
+                setDebugInfo(`Fetch Failed: ${res.status} ${text} \nURL: ${url}`);
                 throw new Error(`API Error ${res.status}: ${text}`);
             }
 
@@ -151,7 +154,7 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
             const eventCount = json.events ? json.events.length : 0;
             const firstEventSnippet = eventCount > 0 ? JSON.stringify(json.events[0], null, 2).slice(0, 200) + "..." : "No events";
 
-            setDebugInfo(`Success: Fetched ${eventCount} events. URL: ${url} \nFirst Event: ${firstEventSnippet}`);
+            setDebugInfo(`Success (${res.status}): Fetched ${eventCount} events.\nTenant: '${tenantId}' \nMAC: '${cleanMac}' \nSince: ${since} \nURL: ${url} \nFirst Event: ${firstEventSnippet}`);
 
             // Log fetch result if empty (to diagnose "No Signal")
             if (!json.events || json.events.length === 0) {
