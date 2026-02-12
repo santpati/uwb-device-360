@@ -22,6 +22,47 @@ async function fetchInitialDevices() {
 
 // ...
 
+function startFirehose() {
+    console.log("Starting Firehose Stream...");
+
+    // Command: curl -vvv "..." | grep -i "IOT_UWB_TAG"
+    const curl = spawn('curl', [
+        '-N', // No buffer
+        '-s', // Silent (we'll capture filtered output)
+        'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
+        '-H', `X-API-Key:${FIREHOSE_API_KEY}`
+    ]);
+
+    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_UWB_TAG']);
+
+    curl.stdout.pipe(grep.stdin);
+    curl.stderr.on('data', (data) => console.error(`CURL ERR: ${data}`)); // To see connection issues
+
+    grep.stdout.on('data', (data) => {
+        const lines = data.toString().split('\n');
+        lines.forEach((line: string) => {
+            if (!line) return;
+            try {
+                // Event format: "data: {...}"
+                if (line.startsWith('data: ')) {
+                    const jsonStr = line.replace('data: ', '');
+                    const event = JSON.parse(jsonStr);
+                    processEvent(event);
+                }
+            } catch (e) {
+                // ignore parse errors for partial lines
+            }
+        });
+    });
+
+    grep.stderr.on('data', (data) => console.error(`GREP ERR: ${data}`));
+
+    curl.on('close', (code) => {
+        console.log(`Firehose connection closed (code ${code}). Restarting in 5s...`);
+        setTimeout(startFirehose, 5000);
+    });
+}
+
 function processEvent(event: any) {
     if (event.eventType !== 'IOT_UWB_TAG') return;
 
