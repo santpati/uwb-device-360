@@ -130,12 +130,14 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
 
             const since = lastTimestampRef.current;
             const cleanMac = macAddress.replace(/:/g, '').toLowerCase();
-            const url = `/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}`;
+            // 1. Add timestamp to URL to prevent browser caching
+            // 2. Add 'no-store' to headers
+            const url = `/api/firehose?tenantId=${tenantId}&macAddress=${cleanMac}&since=${since}&_t=${Date.now()}`;
 
             // DEBUG LOG (Verbose)
             // console.log("Fetching", url);
 
-            const res = await fetch(url);
+            const res = await fetch(url, { cache: 'no-store' });
             if (!res.ok) {
                 const text = await res.text();
                 throw new Error(`API Error ${res.status}: ${text}`);
