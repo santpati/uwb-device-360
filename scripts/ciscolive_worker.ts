@@ -8,15 +8,18 @@ const SYS_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyTmFtZSI6InNhbnRw
 const FIREHOSE_API_KEY = "EA39257AB6CF41FDBA265C97FCF9A95D";
 
 async function fetchInitialDevices() {
-    console.log("Fetching initial device list...");
-    // Fetch from Claimed Devices API or similar to get base list
+    console.log("Fetching initial device list with new token...");
     try {
         const res = await fetch(`https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=1000&sortBy=create_time&sortType=DESCENDING`, {
             headers: {
-                "Cookie": `sys-token=${SYS_TOKEN}`
+                "Cookie": `sys-token=${SYS_TOKEN}`,
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*",
+                "Referer": "https://dnaspaces.io/"
             }
         });
         const json = await res.json();
+
 
         if (json.devices) {
             console.log(`Found ${json.devices.length} devices.`);
