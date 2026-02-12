@@ -165,9 +165,12 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
 
         if (onMacUpdate) onMacUpdate(deviceMac);
         const cleanMac = deviceMac.trim();
+        const cleanMacNoColons = cleanMac.replace(/:/g, "");
 
         try {
             // 1. Fetch Claimed Device Info (Metadata)
+            // Note: This only checks the most recent 100 devices. 
+            // If the device is older, it might not be found here, but might still be found in beacon/floor.
             const claimedPromise = fetchProxy<any>({
                 targetUrl: `https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=100&sortBy=create_time&sortType=DESCENDING`,
                 sysToken: tokens.sys,
@@ -175,17 +178,31 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
             });
 
             // 2. Fetch Beacon/Floor Info (Rich Status: Battery, Location)
-            const encodedMac = encodeURIComponent(cleanMac);
-            const statusPromise = fetchProxy<any>({
-                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodedMac}`,
+            // Try BOTH formats (with and without colons) as APIs can be inconsistent
+            const statusPromise1 = fetchProxy<any>({
+                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodeURIComponent(cleanMac)}`,
                 sysToken: tokens.sys,
                 userAccessToken: tokens.user
             });
 
-            const [claimedRes, statusRes] = await Promise.all([claimedPromise, statusPromise]);
+            const statusPromise2 = fetchProxy<any>({
+                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodeURIComponent(cleanMacNoColons)}`,
+                sysToken: tokens.sys,
+                userAccessToken: tokens.user
+            });
+
+            const [claimedRes, statusRes1, statusRes2] = await Promise.all([claimedPromise, statusPromise1, statusPromise2]);
 
             let mergedDevice: DeviceInfo = { macAddress: cleanMac };
             let mergedLocation: LocationInfo | null = null;
+            let statusRes = null;
+
+            // Determine which status request succeeded
+            if (statusRes1 && Array.isArray(statusRes1) && statusRes1.length > 0) {
+                statusRes = statusRes1;
+            } else if (statusRes2 && Array.isArray(statusRes2) && statusRes2.length > 0) {
+                statusRes = statusRes2;
+            }
 
             // Process Claimed Info
             if (claimedRes && claimedRes.devices) {
@@ -242,18 +259,20 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
             }
 
             // Only update state if we found *something*
-            if (mergedDevice.model || mergedLocation) {
+            // If we have a location OR a model OR it was found in claimed list
+            if (mergedDevice.model || mergedLocation || mergedDevice.createTime) {
                 setDeviceData(mergedDevice as DeviceInfo);
                 setLocationData(mergedLocation);
             } else {
                 setDeviceData(null);
                 setLocationData(null);
-                alert("Device not found.");
+                alert("Device not found. \n\nTips:\n- Ensure the device is claimed or active.\n- Try checking the MAC address format.");
             }
 
         } catch (e: any) {
             console.error(e);
             if (e.status === 401) alert("Session Expired");
+            else alert("Error searching for device. Check console for details.");
         } finally {
             setIsLoading(false);
         }
