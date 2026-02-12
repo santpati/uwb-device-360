@@ -156,6 +156,109 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
         });
     };
 
+    const handleSearch = async () => {
+        if (!tokens || !deviceMac) return;
+        setIsLoading(true);
+        // Don't clear immediately to avoid flickering if we are just refreshing
+        // setDeviceData(null); 
+        // setLocationData(null);
+
+        if (onMacUpdate) onMacUpdate(deviceMac);
+        const cleanMac = deviceMac.trim();
+
+        try {
+            // 1. Fetch Claimed Device Info (Metadata)
+            const claimedPromise = fetchProxy<any>({
+                targetUrl: `https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=100&sortBy=create_time&sortType=DESCENDING`,
+                sysToken: tokens.sys,
+                userAccessToken: tokens.user
+            });
+
+            // 2. Fetch Beacon/Floor Info (Rich Status: Battery, Location)
+            const encodedMac = encodeURIComponent(cleanMac);
+            const statusPromise = fetchProxy<any>({
+                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodedMac}`,
+                sysToken: tokens.sys,
+                userAccessToken: tokens.user
+            });
+
+            const [claimedRes, statusRes] = await Promise.all([claimedPromise, statusPromise]);
+
+            let mergedDevice: DeviceInfo = { macAddress: cleanMac };
+            let mergedLocation: LocationInfo | null = null;
+
+            // Process Claimed Info
+            if (claimedRes && claimedRes.devices) {
+                const found = claimedRes.devices.find((d: any) =>
+                    d.macAddress?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, "")) ||
+                    d.mac?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, ""))
+                );
+                if (found) {
+                    saveToHistory(found.macAddress || found.mac || cleanMac);
+                    mergedDevice = {
+                        ...mergedDevice,
+                        macAddress: found.macAddress || found.mac,
+                        name: found.name,
+                        createTime: found.create_time,
+                        lastSeenTime: found.lastseen,
+                        batteryStatus: found.batteryLevel, // Fallback
+                        firmwareVersion: found.firmware,
+                        claimed: true,
+                        model: found.model,
+                        make: found.make,
+                        serialNumber: found.serial_number,
+                        vendor: found.vendor
+                    };
+                }
+            }
+
+            // Process Beacon/Floor Info (Overrides with fresher data)
+            if (statusRes && Array.isArray(statusRes) && statusRes.length > 0) {
+                // API returns array of matches
+                const status = statusRes[0];
+                if (status) {
+                    // Update Device Info
+                    mergedDevice.batteryStatus = status.batteryLevel ?? mergedDevice.batteryStatus;
+                    mergedDevice.lastSeenTime = status.lastLocatedTime ?? status.lastSeen ?? mergedDevice.lastSeenTime;
+
+                    if (status.deviceProfile) {
+                        mergedDevice.model = status.deviceProfile.model || mergedDevice.model;
+                        mergedDevice.vendor = status.deviceProfile.vendor || mergedDevice.vendor;
+                    }
+
+                    // Update Location Info
+                    if (status.geoCoordinates) {
+                        mergedLocation = {
+                            latitude: status.geoCoordinates[0],
+                            longitude: status.geoCoordinates[1],
+                            computeType: status.computeType || 'Unknown',
+                            lastLocatedTime: status.lastLocatedTime
+                        };
+                    } else if (status.location && status.location.x && status.location.y) {
+                        // If we only have X/Y but not Lat/Long, we can't map it easily on Leaflet without a floorplan.
+                        // But usually beacon/floor returns geoCoordinates if the floor is geo-aligned.
+                    }
+                }
+            }
+
+            // Only update state if we found *something*
+            if (mergedDevice.model || mergedLocation) {
+                setDeviceData(mergedDevice as DeviceInfo);
+                setLocationData(mergedLocation);
+            } else {
+                setDeviceData(null);
+                setLocationData(null);
+                alert("Device not found.");
+            }
+
+        } catch (e: any) {
+            console.error(e);
+            if (e.status === 401) alert("Session Expired");
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // ... (Render)
     return (
         <div className="flex flex-col gap-6">
