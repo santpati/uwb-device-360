@@ -125,13 +125,29 @@ function processEvent(event: any) {
     upsertDevice(update);
 
     // 2. Update Stats (UWB vs BLE)
-    // "identify if the event is TDoA/UWB or event is RSSI/BLE"
-    // Using computeType
-    const pos = telemetry.precisePosition || telemetry.detectedPosition;
-    if (pos) {
-        const type = (pos.computeType === 'TDoA') ? 'UWB' : 'BLE';
-        incrementStat(mac, type, event.timestamp);
+    // Logic aligned with SignalChart.tsx
+    const detectedPos = telemetry.detectedPosition;
+    const precisePos = telemetry.precisePosition;
+
+    // Helper from SignalChart: "isStrictTDOA"
+    // Checks for CT_TDOA and valid coordinates
+    const isStrictTDOA = (pos: any) => {
+        if (!pos) return false;
+        // Accept both 'CT_TDOA' (from SignalChart) and 'TDoA' (typical API) just in case
+        const isTdoa = pos.computeType === 'CT_TDOA' || pos.computeType === 'TDoA';
+        const hasCoords = (pos.xPos !== 0 || pos.yPos !== 0);
+        return isTdoa && hasCoords;
+    };
+
+    let type: 'UWB' | 'BLE' = 'BLE';
+    if (isStrictTDOA(detectedPos) || isStrictTDOA(precisePos)) {
+        type = 'UWB';
+    } else {
+        // Default to BLE if not strict UWB TDoA (covers BLE_RSSI, etc.)
+        type = 'BLE';
     }
+
+    incrementStat(mac, type, event.timestamp);
 }
 
 // Main
