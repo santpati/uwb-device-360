@@ -8,88 +8,19 @@ const SYS_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyTmFtZSI6InNhbnRw
 const FIREHOSE_API_KEY = "EA39257AB6CF41FDBA265C97FCF9A95D";
 
 async function fetchInitialDevices() {
-    // console.log("Skipping initial device fetch in worker (delegated to frontend sync)...");
-    // return;
+    console.log("Skipping initial device fetch in worker (delegated to frontend sync)...");
+    return;
+    /*
     console.log("Fetching initial device list with new token...");
     try {
-        const res = await fetch(`https://dnaspaces.io/api/edm/v1/device/partner/claimedbeacons?page=1&pageSize=1000&sortBy=create_time&sortType=DESCENDING`, {
-            headers: {
-                "Cookie": `sys-token=${SYS_TOKEN}`,
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "*/*",
-                "Referer": "https://dnaspaces.io/"
-            }
-        });
-        console.log(`API Status: ${res.status}`);
-        const json = await res.json();
-        console.log("API Response:", JSON.stringify(json).substring(0, 500)); // Log first 500 chars
-
-
-        if (json.devices) {
-            console.log(`Found ${json.devices.length} devices.`);
-            const TARGET_MODELS = ['QORVO-UWB', 'SPACES-CT-UB'];
-            const filtered = json.devices.filter((d: any) =>
-                TARGET_MODELS.some(m => d.model?.toUpperCase().includes(m)) ||
-                TARGET_MODELS.includes(d.model?.toUpperCase())
-            );
-            console.log(`Filtered to ${filtered.length} UWB devices.`);
-
-            filtered.forEach((d: any) => {
-                upsertDevice({
-                    mac: d.macAddress || d.mac,
-                    name: d.name,
-                    model: d.model,
-                    firmware: d.firmwareVersion || d.firmware,
-                    vendor: d.vendor,
-                    lastSeen: d.lastSeen || d.lastSeenTime
-                });
-            });
-        }
+        // ... (commented out) ...
     } catch (e) {
         console.error("Error fetching initial devices:", e);
     }
+    */
 }
 
-function startFirehose() {
-    console.log("Starting Firehose Stream...");
-
-    // Command: curl -vvv "..." | grep -i "IOT_UWB_TAG"
-    const curl = spawn('curl', [
-        '-N', // No buffer
-        '-s', // Silent (we'll capture filtered output)
-        'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
-        '-H', `X-API-Key:${FIREHOSE_API_KEY}`
-    ]);
-
-    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_UWB_TAG']);
-
-    curl.stdout.pipe(grep.stdin);
-    curl.stderr.on('data', (data) => console.error(`CURL ERR: ${data}`)); // To see connection issues
-
-    grep.stdout.on('data', (data) => {
-        const lines = data.toString().split('\n');
-        lines.forEach((line: string) => {
-            if (!line) return;
-            try {
-                // Event format: "data: {...}"
-                if (line.startsWith('data: ')) {
-                    const jsonStr = line.replace('data: ', '');
-                    const event = JSON.parse(jsonStr);
-                    processEvent(event);
-                }
-            } catch (e) {
-                // ignore parse errors for partial lines
-            }
-        });
-    });
-
-    grep.stderr.on('data', (data) => console.error(`GREP ERR: ${data}`));
-
-    curl.on('close', (code) => {
-        console.log(`Firehose connection closed (code ${code}). Restarting in 5s...`);
-        setTimeout(startFirehose, 5000);
-    });
-}
+// ...
 
 function processEvent(event: any) {
     if (event.eventType !== 'IOT_UWB_TAG') return;
@@ -101,13 +32,34 @@ function processEvent(event: any) {
     if (!mac) return;
 
     // 1. Update Device Info (Battery, Firmware)
-    const update: any = { mac };
-    if (telemetry.batteryLevel !== undefined) update.battery = telemetry.batteryLevel;
+    // We must provide ALL named parameters expected by upsertDevice if the query uses them.
+    // However, upsertDevice in ciscolive_db.ts likely constructs the query dynamically or expects specific fields.
+    // Let's pass null for missing fields if upsertDevice expects them.
+    // Checking ciscolive_db.ts:
+    // upsertDevice expects object with optional props, but the SQL might use @battery etc.
+    // If the SQL uses @battery, better-sqlite3 requires it to be present in the object.
+
+    const update: any = {
+        mac,
+        battery: telemetry.batteryLevel !== undefined ? telemetry.batteryLevel : null,
+        // We aren't getting these from telemetry usually, but pass null/undefined to be safe if strict
+        // But better yet, let's fix upsertDevice to handle missing keys or pass them here.
+        // For now, let's just pass what we have, but ensure we don't crash.
+        // If upsertDevice uses @battery, we MUST pass battery.
+    };
+
+    // Actually, looking at ciscolive_db.ts, I see it uses @battery, @model etc. directly.
+    // So we MUST pass all of them.
+    update.model = null; // Telemetry usually doesn't have model
+    update.firmware = null;
+    update.vendor = null;
+    update.name = null;
+
+    // Override if present
     if (telemetry.files && telemetry.files.length > 0) {
-        // sometimes firmware info is in text files/status?
-        // Actually usually in device info events, but let's grab what we can.
+        // ...
     }
-    // Update last seen
+
     update.lastSeen = event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString();
 
     upsertDevice(update);
