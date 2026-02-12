@@ -43,11 +43,15 @@ function startFirehose() {
         lines.forEach((line: string) => {
             if (!line) return;
             try {
-                // Event format: "data: {...}"
                 if (line.startsWith('data: ')) {
                     const jsonStr = line.replace('data: ', '');
-                    const event = JSON.parse(jsonStr);
-                    processEvent(event);
+                    try {
+                        const event = JSON.parse(jsonStr);
+                        // console.log(`[Firehose] Received event: ${event.eventType}`); // Log every event type
+                        processEvent(event);
+                    } catch (e) {
+                        console.error("Error parsing event JSON", e);
+                    }
                 }
             } catch (e) {
                 // ignore parse errors for partial lines
@@ -64,13 +68,28 @@ function startFirehose() {
 }
 
 function processEvent(event: any) {
-    if (event.eventType !== 'IOT_UWB_TAG') return;
+    // Debug log for event types
+    // console.log(`Processing: ${event.eventType}`);
 
-    const telemetry = event.iotTelemetry;
+    if (event.eventType !== 'IOT_UWB_TAG' && event.eventType !== 'IOT_TELEMETRY') return;
+
+    // Support BOTH event types
+    let telemetry = event.iotTelemetry;
+
+    // For IOT_TELEMETRY, structure might be different or nested in details
+    if (event.eventType === 'IOT_TELEMETRY') {
+        const details = typeof event.details === 'string' ? JSON.parse(event.details) : event.details;
+        telemetry = details?.iotTelemetry || event.iotTelemetry;
+    }
+
     if (!telemetry) return;
 
     const mac = telemetry.deviceMacAddress || telemetry.deviceMac;
     if (!mac) return;
+
+    console.log(`[Firehose] Event for ${mac} (${event.eventType})`);
+
+    // ... rest of function ...
 
     // 1. Update Device Info (Battery, Firmware)
     // We must provide ALL named parameters expected by upsertDevice if the query uses them.
