@@ -165,7 +165,8 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
 
         if (onMacUpdate) onMacUpdate(deviceMac);
         const cleanMac = deviceMac.trim();
-        const cleanMacNoColons = cleanMac.replace(/:/g, "");
+        const cleanMacLower = cleanMac.toLowerCase();
+        const cleanMacNoColons = cleanMacLower.replace(/:/g, "");
 
         try {
             // 1. Fetch Claimed Device Info (Metadata)
@@ -179,16 +180,24 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
 
             // 2. Fetch Beacon/Floor Info (Rich Status: Battery, Location)
             // Try BOTH formats (with and without colons) as APIs can be inconsistent
+            // Use lowercase as per successful curl example
+            const commonHeaders = {
+                'Referer': 'https://dnaspaces.io/devices/device_management',
+                'Accept': '*/*'
+            };
+
             const statusPromise1 = fetchProxy<any>({
-                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodeURIComponent(cleanMac)}`,
+                targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodeURIComponent(cleanMacLower)}`,
                 sysToken: tokens.sys,
-                userAccessToken: tokens.user
+                userAccessToken: tokens.user,
+                headers: commonHeaders
             });
 
             const statusPromise2 = fetchProxy<any>({
                 targetUrl: `https://dnaspaces.io/api/edm/v1/device/beacon/floor?page=1&pageSize=50&key=mac&condition=EQUALS&value=${encodeURIComponent(cleanMacNoColons)}`,
                 sysToken: tokens.sys,
-                userAccessToken: tokens.user
+                userAccessToken: tokens.user,
+                headers: commonHeaders
             });
 
             const [claimedRes, statusRes1, statusRes2] = await Promise.all([claimedPromise, statusPromise1, statusPromise2]);
@@ -225,7 +234,7 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                 });
 
                 if (claimedDevice) {
-                    saveToHistory(claimedDevice.macAddress || claimedDevice.mac || claimedDevice.mac_address || cleanMac);
+                    saveToHistory(claimedDevice.macAddress || claimedDevice.mac || cleanMac);
                     mergedDevice = {
                         ...mergedDevice,
                         macAddress: claimedDevice.macAddress || claimedDevice.mac || claimedDevice.mac_address || cleanMac,
@@ -249,7 +258,12 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                 const status = statusRes[0];
                 if (status) {
                     // Update Device Info
-                    mergedDevice.batteryStatus = status.batteryLevel ?? mergedDevice.batteryStatus;
+                    // Note: batteryLevel can be 0, so use nullish coalescing carefully
+                    // If status.batteryLevel is defined (even 0), usage it.
+                    if (status.batteryLevel !== undefined && status.batteryLevel !== null) {
+                        mergedDevice.batteryStatus = status.batteryLevel;
+                    }
+
                     mergedDevice.lastSeenTime = status.lastLocatedTime ?? status.lastSeen ?? mergedDevice.lastSeenTime;
 
                     if (status.deviceProfile) {
@@ -266,8 +280,11 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
                             lastLocatedTime: status.lastLocatedTime
                         };
                     } else if (status.location && status.location.x && status.location.y) {
-                        // If we only have X/Y but not Lat/Long, we can't map it easily on Leaflet without a floorplan.
-                        // But usually beacon/floor returns geoCoordinates if the floor is geo-aligned.
+                        // If we only have X/Y but not Lat/Long, use X/Y as lat/long placeholder if needed
+                        // but for map we need lat/long. 
+                        // We can store it in locationData anyway for display text
+                        // But LocationInfo interface expects lat/long numbers.
+                        // Let's check computeType.
                     }
                 }
             }
@@ -430,15 +447,23 @@ Tips:
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
-                                <div>
                                     <span className="block text-zinc-500 text-xs uppercase tracking-wider">Battery</span>
-                                    <div className="mt-1">
-                                        <BatteryLevel level={deviceData.batteryStatus || 0} />
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <div className="flex-1">
+                                             <BatteryLevel level={deviceData.batteryStatus !== undefined ? Number(deviceData.batteryStatus) : 0} />
+                                        </div>
+                                        {deviceData.batteryStatus !== undefined ? (
+                                            <span className="text-zinc-400 text-xs">{deviceData.batteryStatus}%</span>
+                                        ) : (
+                                            <span className="text-zinc-600 text-xs italic">N/A</span>
+                                        )}
                                     </div>
                                 </div>
                                 <div>
-                                    <span className="block text-zinc-500 text-xs uppercase tracking-wider">Serial / Order ID</span>
-                                    <span className="text-zinc-300 block mt-1 text-sm truncate">{deviceData.serialNumber || 'N/A'}</span>
+                                    <span className="block text-zinc-500 text-xs uppercase tracking-wider">Last Location</span>
+                                    <span className="text-zinc-300 block mt-1 text-sm truncate">
+                                        {locationData ? `${locationData.latitude.toFixed(6)}, ${locationData.longitude.toFixed(6)}` : 'Unknown'}
+                                    </span>
                                 </div>
                             </div>
 
@@ -456,146 +481,146 @@ Tips:
                                 </div>
                             </div>
                         </div>
+                ) : (
+                <div className="h-48 flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
+                    No device data loaded
+                </div>
+                    )}
+            </div>
+
+            {/* Right Column: Location & Signals */}
+            <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
+                {/* Location Card */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative flex-1 min-h-[300px]">
+                    <h3 className="text-zinc-400 font-medium mb-4 uppercase tracking-wider text-xs flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                        Real-time Location
+                    </h3>
+                    {locationData ? (
+                        <div className="flex flex-col md:flex-row gap-6 h-full">
+                            <div className="flex-1 bg-zinc-950 rounded-2xl border border-zinc-800 relative overflow-hidden min-h-[250px] shadow-inner">
+                                <LocationMap
+                                    latitude={locationData.latitude}
+                                    longitude={locationData.longitude}
+                                    deviceName={deviceData?.name || deviceData?.macAddress}
+                                />
+                                <div className="absolute bottom-2 left-2 right-2 bg-black/50 backdrop-blur-md p-2 rounded-lg flex items-center justify-between text-[10px] text-zinc-300 border border-white/10 pointer-events-none">
+                                    <div className="flex items-center gap-1.5">
+                                        <MapPin className="w-3 h-3 text-blue-400" />
+                                        <span className="font-mono">{locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}</span>
+                                    </div>
+                                    <span className="text-zinc-500">{locationData.computeType || 'Unknown'}</span>
+                                </div>
+                            </div>
+                        </div>
                     ) : (
-                        <div className="h-48 flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
-                            No device data loaded
+                        <div className="h-full min-h-[200px] flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
+                            Waiting for location stream...
                         </div>
                     )}
                 </div>
 
-                {/* Right Column: Location & Signals */}
-                <div className="col-span-1 lg:col-span-2 flex flex-col gap-6">
-                    {/* Location Card */}
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative flex-1 min-h-[300px]">
-                        <h3 className="text-zinc-400 font-medium mb-4 uppercase tracking-wider text-xs flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                            Real-time Location
-                        </h3>
-                        {locationData ? (
-                            <div className="flex flex-col md:flex-row gap-6 h-full">
-                                <div className="flex-1 bg-zinc-950 rounded-2xl border border-zinc-800 relative overflow-hidden min-h-[250px] shadow-inner">
-                                    <LocationMap
-                                        latitude={locationData.latitude}
-                                        longitude={locationData.longitude}
-                                        deviceName={deviceData?.name || deviceData?.macAddress}
-                                    />
-                                    <div className="absolute bottom-2 left-2 right-2 bg-black/50 backdrop-blur-md p-2 rounded-lg flex items-center justify-between text-[10px] text-zinc-300 border border-white/10 pointer-events-none">
-                                        <div className="flex items-center gap-1.5">
-                                            <MapPin className="w-3 h-3 text-blue-400" />
-                                            <span className="font-mono">{locationData.latitude.toFixed(6)}, {locationData.longitude.toFixed(6)}</span>
-                                        </div>
-                                        <span className="text-zinc-500">{locationData.computeType || 'Unknown'}</span>
-                                    </div>
+                {/* Signal Status Component (existing) ... */}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative">
+                    {/* ... (Signal Status Indicators) ... */}
+                    <h3 className="text-zinc-400 font-medium mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                        Signal Status
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* ... (Sign of Life) ... */}
+                        <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${locationData ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                            <div className={`p-2 rounded-xl ${locationData ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                <Activity className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Sign of Life</span>
+                                <div className="flex items-center gap-2">
+                                    {locationData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                    <span className={`text-sm font-medium ${locationData ? 'text-white' : 'text-zinc-600'}`}>{locationData ? 'Active' : 'Pending'}</span>
                                 </div>
                             </div>
-                        ) : (
-                            <div className="h-full min-h-[200px] flex items-center justify-center text-zinc-700 italic border-2 border-dashed border-zinc-800/50 rounded-xl">
-                                Waiting for location stream...
-                            </div>
-                        )}
-                    </div>
+                        </div>
 
-                    {/* Signal Status Component (existing) ... */}
-                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-6 relative">
-                        {/* ... (Signal Status Indicators) ... */}
-                        <h3 className="text-zinc-400 font-medium mb-6 uppercase tracking-wider text-xs flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                            Signal Status
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* ... (Sign of Life) ... */}
-                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${locationData ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
-                                <div className={`p-2 rounded-xl ${locationData ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
-                                    <Activity className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">Sign of Life</span>
-                                    <div className="flex items-center gap-2">
-                                        {locationData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
-                                        <span className={`text-sm font-medium ${locationData ? 'text-white' : 'text-zinc-600'}`}>{locationData ? 'Active' : 'Pending'}</span>
-                                    </div>
+                        {/* ... (BLE) ... */}
+                        <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.ble ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                            <div className={`p-2 rounded-xl ${signalsDetected.ble ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                <Wifi className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">BLE Signal</span>
+                                <div className="flex items-center gap-2">
+                                    {signalsDetected.ble ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                    <span className={`text-sm font-medium ${signalsDetected.ble ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.ble ? 'Detected' : 'Searching'}</span>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* ... (BLE) ... */}
-                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.ble ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
-                                <div className={`p-2 rounded-xl ${signalsDetected.ble ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
-                                    <Wifi className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">BLE Signal</span>
-                                    <div className="flex items-center gap-2">
-                                        {signalsDetected.ble ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
-                                        <span className={`text-sm font-medium ${signalsDetected.ble ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.ble ? 'Detected' : 'Searching'}</span>
-                                    </div>
-                                </div>
+                        {/* ... (UWB) ... */}
+                        <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.uwb ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
+                            <div className={`p-2 rounded-xl ${signalsDetected.uwb ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
+                                <Radio className="w-6 h-6" />
                             </div>
-
-                            {/* ... (UWB) ... */}
-                            <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${signalsDetected.uwb ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-zinc-900 border-zinc-800'}`}>
-                                <div className={`p-2 rounded-xl ${signalsDetected.uwb ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-600'}`}>
-                                    <Radio className="w-6 h-6" />
-                                </div>
-                                <div>
-                                    <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">UWB Signal</span>
-                                    <div className="flex items-center gap-2">
-                                        {signalsDetected.uwb ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
-                                        <span className={`text-sm font-medium ${signalsDetected.uwb ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.uwb ? 'Detected' : 'Searching'}</span>
-                                    </div>
+                            <div>
+                                <span className="block text-xs uppercase tracking-wider text-zinc-500 mb-1">UWB Signal</span>
+                                <div className="flex items-center gap-2">
+                                    {signalsDetected.uwb ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4 rounded-full border-2 border-zinc-700" />}
+                                    <span className={`text-sm font-medium ${signalsDetected.uwb ? 'text-white' : 'text-zinc-600'}`}>{signalsDetected.uwb ? 'Detected' : 'Searching'}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                {/* Device Lifecycle Widget */}
-                {/* ... (remains same) ... */}
-                <div className="col-span-1 lg:col-span-3">
-                    {deviceData && tokens?.sys ? (
-                        <DeviceLifecycle
-                            macAddress={deviceData.macAddress}
-                            sysToken={tokens.sys}
-                            userAccessToken={tokens.user}
-                        />
-                    ) : null}
-                </div>
-
-                {/* Signal Strength Data & Chart */}
-                {tokens?.firehoseApiKey ? (
-                    <div className="col-span-1 lg:col-span-3">
-                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-t-3xl p-4 border-b-0 flex justify-between items-center">
-                            <span className="text-zinc-500 text-xs font-mono">
-                                Firehose Key: <span className="text-zinc-300">{tokens.firehoseApiKey.substring(0, 8)}...</span>
-                            </span>
-                            {/* ... */}
-                        </div>
-                        {deviceData ? (
-                            <SignalChart
-                                macAddress={deviceData.macAddress}
-                                apiKey={tokens.firehoseApiKey}
-                                ssoUser={tokens.ssoUser}
-                                onSignalDetected={handleSignalDetected}
-                                onEvent={handleRealtimeEvent}
-                            />
-                        ) : (
-                            <div className="bg-zinc-900/50 border border-zinc-800 rounded-b-3xl p-6 border-t-0">
-                                {/* ... Placeholder for chart ... */}
-                                <div className="flex items-center justify-between mb-6">
-                                    <h3 className="text-zinc-400 font-medium uppercase tracking-wider text-xs flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
-                                        Signal Analysis (BLE & UWB)
-                                    </h3>
-                                    <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-500 uppercase">Input Required</span>
-                                </div>
-                                <div className="h-32 flex items-center justify-center text-zinc-800">
-                                    <Wifi className="w-8 h-8 opacity-20" />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ) : null}
-
             </div>
+
+            {/* Device Lifecycle Widget */}
+            {/* ... (remains same) ... */}
+            <div className="col-span-1 lg:col-span-3">
+                {deviceData && tokens?.sys ? (
+                    <DeviceLifecycle
+                        macAddress={deviceData.macAddress}
+                        sysToken={tokens.sys}
+                        userAccessToken={tokens.user}
+                    />
+                ) : null}
+            </div>
+
+            {/* Signal Strength Data & Chart */}
+            {tokens?.firehoseApiKey ? (
+                <div className="col-span-1 lg:col-span-3">
+                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-t-3xl p-4 border-b-0 flex justify-between items-center">
+                        <span className="text-zinc-500 text-xs font-mono">
+                            Firehose Key: <span className="text-zinc-300">{tokens.firehoseApiKey.substring(0, 8)}...</span>
+                        </span>
+                        {/* ... */}
+                    </div>
+                    {deviceData ? (
+                        <SignalChart
+                            macAddress={deviceData.macAddress}
+                            apiKey={tokens.firehoseApiKey}
+                            ssoUser={tokens.ssoUser}
+                            onSignalDetected={handleSignalDetected}
+                            onEvent={handleRealtimeEvent}
+                        />
+                    ) : (
+                        <div className="bg-zinc-900/50 border border-zinc-800 rounded-b-3xl p-6 border-t-0">
+                            {/* ... Placeholder for chart ... */}
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-zinc-400 font-medium uppercase tracking-wider text-xs flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-orange-500"></span>
+                                    Signal Analysis (BLE & UWB)
+                                </h3>
+                                <span className="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-500 uppercase">Input Required</span>
+                            </div>
+                            <div className="h-32 flex items-center justify-center text-zinc-800">
+                                <Wifi className="w-8 h-8 opacity-20" />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            ) : null}
+
         </div>
+        </div >
     );
 }
