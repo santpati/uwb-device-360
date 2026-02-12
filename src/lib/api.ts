@@ -5,6 +5,7 @@ interface ProxyRequest {
     body?: any;
     sysToken: string;
     userAccessToken?: string;
+    headers?: Record<string, string>;
 }
 
 export async function fetchProxy<T>(params: ProxyRequest): Promise<T> {
