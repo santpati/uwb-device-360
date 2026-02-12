@@ -445,5 +445,6 @@ export default function SignalChart({ macAddress, apiKey, ssoUser, onSignalDetec
                 </div>
 
             </div>
-            );
+        </div>
+    );
 }
