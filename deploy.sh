@@ -33,9 +33,10 @@ ssh -o StrictHostKeyChecking=no -i "$PEM_FILE" $HOST << EOF
     # Check for Directory & Backup
     if [ -d "$REMOTE_DIR" ]; then
         echo "💾 Creating Remote Backup..."
+        # Note: We escape \$BACKUP_NAME so it is expanded on the REMOTE server, not locally.
         BACKUP_NAME="${REMOTE_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-        cp -r $REMOTE_DIR $BACKUP_NAME
-        echo "✅ Backup created: $BACKUP_NAME"
+        cp -r $REMOTE_DIR \$BACKUP_NAME
+        echo "✅ Backup created: \$BACKUP_NAME"
 
         echo "🔄 Pulling latest changes..."
         cd $REMOTE_DIR
