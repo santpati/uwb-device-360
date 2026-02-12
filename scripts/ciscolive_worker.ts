@@ -2,56 +2,38 @@
 // This script runs independently to process Firehose events
 import { spawn } from 'child_process';
 import { getCiscoDB, upsertDevice, incrementStat } from '../src/lib/ciscolive_db';
-// Global fetch is available in Node 18+
 
 // Specific API Key for CiscoLive Page
 const FIREHOSE_API_KEY = "B3DB01B8C4B64856BE66CB862FF84F57";
 
-// We don't need initial device fetch loop in worker anymore,
-// as the frontend sends device info via /api/ciscolive/data POST syncDevices.
-
 function startFirehose() {
-    console.log("Starting Firehose Stream with GREP filter...");
-    console.log(`Command: curl ... | grep -i "IOT_TELEMETRY"`);
+    console.log("Starting Firehose Stream with SHELL PIPELINE...");
 
-    // 1. Spawn GREP first
-    // User requested change from IOT_UWB_TAG to IOT_TELEMETRY
-    const grep = spawn('grep', ['--line-buffered', '-i', 'IOT_TELEMETRY'], {
-        stdio: ['pipe', 'pipe', 'pipe']
-    });
+    // Construct the exact command that verified working manually
+    // Note: We use -s but also -v to capture debug info to stderr which we process below
+    const cmd = `/usr/bin/curl -v -N -s "https://partners.dnaspaces.io/api/partners/v1/firehose/events" -H "X-API-Key: ${FIREHOSE_API_KEY}" | grep --line-buffered -i "IOT_TELEMETRY"`;
 
-    // 2. Spawn CURL and pipe to GREP
-    const curl = spawn('/usr/bin/curl', [
-        '-v', // verbose to debug connection
-        '-N', // no buffer
-        'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
-        '-H', `X-API-Key: ${FIREHOSE_API_KEY}`
-    ], {
-        stdio: ['ignore', 'pipe', 'pipe']
-    });
+    console.log(`Running: ${cmd}`);
 
-    // Pipe CURL -> GREP
-    curl.stdout.pipe(grep.stdin);
+    // Spawn Shell to handle the pipe natively: /bin/sh -c "..."
+    const pipeline = spawn('/bin/sh', ['-c', cmd]);
+
+    console.log(`Pipeline PID: ${pipeline.pid}`);
 
     // Error handling
-    curl.on('error', (err) => console.error('CURL SPAWN ERROR:', err));
-    grep.on('error', (err) => console.error('GREP SPAWN ERROR:', err));
+    pipeline.on('error', (err) => console.error('PIPELINE SPAWN ERROR:', err));
 
-    curl.stderr.on('data', (data) => {
+    pipeline.stderr.on('data', (data) => {
+        // This captures stderr from both curl (if -v) and grep
         const msg = data.toString();
-        // Log connection details for debug, but ignore standard progress
         if (msg.includes('*') || msg.includes('Error') || msg.includes('fail')) {
-            console.log(`CURL DEBUG: ${msg.trim()}`);
+            console.log(`PIPELINE DEBUG: ${msg.trim()}`);
         }
     });
 
-    grep.stderr.on('data', (data) => {
-        console.error(`GREP STDERR: ${data.toString()}`);
-    });
-
-    // Process GREP Output (Filtered Events)
+    // Process Pipeline Output (stdout of grep)
     let buffer = '';
-    grep.stdout.on('data', (data) => {
+    pipeline.stdout.on('data', (data) => {
         buffer += data.toString();
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -59,17 +41,14 @@ function startFirehose() {
         lines.forEach((line) => {
             if (!line.trim()) return;
 
-            // Firehose usually sends "data: {...}"
-            // Grep output will preserve this.
-
             try {
                 let jsonStr = line;
+                // Firehose often sends "data: {...}" but grep output might just be the line
                 if (line.startsWith('data: ')) {
                     jsonStr = line.replace('data: ', '');
                 }
 
-                // Determine if it's JSON
-                if (jsonStr.startsWith('{')) {
+                if (jsonStr.trim().startsWith('{')) {
                     const event = JSON.parse(jsonStr);
                     processEvent(event);
                 }
@@ -80,10 +59,8 @@ function startFirehose() {
     });
 
     // Restart logic
-    curl.on('close', (code) => {
-        console.log(`CURL exited with code ${code}. Restarting in 5s...`);
-        // Kill grep if curl dies to clean up
-        grep.kill();
+    pipeline.on('close', (code) => {
+        console.log(`Pipeline exited with code ${code}. Restarting in 5s...`);
         setTimeout(startFirehose, 5000);
     });
 }
@@ -91,17 +68,13 @@ function startFirehose() {
 function processEvent(event: any) {
     if (!event) return;
 
-    // We only care about IOT_UWB_TAG because grep filtered for it.
-    // However, grep -i "IOT_UWB_TAG" might catch "deviceType":"IOT_UWB_TAG" inside an IOT_TELEMETRY event.
-    // So we must handle IOT_TELEMETRY structure too.
+    // We filter for IOT_TELEMETRY now via grep.
 
     let telemetry = event.iotTelemetry;
     if (event.eventType === 'IOT_TELEMETRY') {
-        // Should allow it if grep let it through
         const details = typeof event.details === 'string' ? JSON.parse(event.details) : event.details;
         telemetry = details?.iotTelemetry || event.iotTelemetry;
     } else if (event.eventType === 'IOT_UWB_TAG') {
-        // Direct event
         telemetry = event.iotTelemetry;
     }
 
@@ -112,7 +85,7 @@ function processEvent(event: any) {
 
     console.log(`[Event] Processing ${mac} (${event.eventType})`);
 
-    // 1. Update Device Metadata (Last Seen, Battery, etc)
+    // 1. Update Device Metadata
     const update: any = {
         mac,
         lastSeen: event.timestamp ? new Date(event.timestamp).toISOString() : new Date().toISOString(),
@@ -121,9 +94,7 @@ function processEvent(event: any) {
 
     if (telemetry.batteryLevel !== undefined) update.battery = telemetry.batteryLevel;
 
-    // We strictly use upsertDevice to keep existing user data (name, layout) safe
     upsertDevice(update);
-
 
     // 2. Update Stats (UWB vs BLE)
     const detectedPos = telemetry.detectedPosition;
