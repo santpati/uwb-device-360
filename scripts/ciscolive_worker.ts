@@ -34,8 +34,14 @@ function startFirehose() {
         '-N', // No buffer
         '-s', // Silent (we'll capture filtered output)
         'https://partners.dnaspaces.io/api/partners/v1/firehose/events',
-        '-H', `X-API-Key:${FIREHOSE_API_KEY}`
-    ]);
+        '-H', `X-API-Key: ${FIREHOSE_API_KEY}`
+    ], {
+        stdio: ['ignore', 'pipe', 'pipe'] // Ignore stdin to prevent EPIPE
+    });
+
+    curl.on('error', (err) => {
+        console.error('Failed to spawn curl:', err);
+    });
 
     // Buffer for partial lines
     let buffer = '';
