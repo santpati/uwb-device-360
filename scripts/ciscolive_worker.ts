@@ -18,7 +18,9 @@ async function fetchInitialDevices() {
                 "Referer": "https://dnaspaces.io/"
             }
         });
+        console.log(`API Status: ${res.status}`);
         const json = await res.json();
+        console.log("API Response:", JSON.stringify(json).substring(0, 500)); // Log first 500 chars
 
 
         if (json.devices) {
