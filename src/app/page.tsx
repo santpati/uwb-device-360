@@ -234,7 +234,7 @@ export default function Home() {
               tokens={tokens}
               initialMac={tab.mac}
               isActive={activeTabId === tab.id}
-              onMacUpdate={(mac) => updateTabMac(tab.id, mac)}
+              onMacUpdate={(mac: string) => updateTabMac(tab.id, mac)}
             />
           </div>
         ))}
