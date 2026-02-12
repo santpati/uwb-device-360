@@ -205,26 +205,40 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
             }
 
             // Process Claimed Info
+            let claimedDevice = null;
+            let firstDeviceKeys = "";
+
             if (claimedRes && claimedRes.devices) {
-                const found = claimedRes.devices.find((d: any) =>
-                    d.macAddress?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, "")) ||
-                    d.mac?.toLowerCase().includes(cleanMac.toLowerCase().replace(/:/g, ""))
-                );
-                if (found) {
-                    saveToHistory(found.macAddress || found.mac || cleanMac);
+                // Debug: Capture keys of the first device to verify field names
+                if (claimedRes.devices.length > 0) {
+                    firstDeviceKeys = JSON.stringify(Object.keys(claimedRes.devices[0]).slice(0, 5));
+                }
+
+                // Robust Matching: Normalize everything to plain hex string
+                const normalize = (s: string) => s ? s.replace(/[^a-fA-F0-9]/g, '').toLowerCase() : '';
+                const targetBase = normalize(cleanMac);
+
+                claimedDevice = claimedRes.devices.find((d: any) => {
+                    // Check all possible MAC fields
+                    const macs = [d.macAddress, d.mac, d.mac_address, d.deviceId].map(m => normalize(m));
+                    return macs.some(m => m.includes(targetBase) && m.length > 0);
+                });
+
+                if (claimedDevice) {
+                    saveToHistory(claimedDevice.macAddress || claimedDevice.mac || claimedDevice.mac_address || cleanMac);
                     mergedDevice = {
                         ...mergedDevice,
-                        macAddress: found.macAddress || found.mac,
-                        name: found.name,
-                        createTime: found.create_time,
-                        lastSeenTime: found.lastseen,
-                        batteryStatus: found.batteryLevel, // Fallback
-                        firmwareVersion: found.firmware,
+                        macAddress: claimedDevice.macAddress || claimedDevice.mac || claimedDevice.mac_address || cleanMac,
+                        name: claimedDevice.name,
+                        createTime: claimedDevice.create_time,
+                        lastSeenTime: claimedDevice.lastseen || claimedDevice.last_seen,
+                        batteryStatus: claimedDevice.batteryLevel || claimedDevice.battery_level, // Fallback
+                        firmwareVersion: claimedDevice.firmware || claimedDevice.firmware_version,
                         claimed: true,
-                        model: found.model,
-                        make: found.make,
-                        serialNumber: found.serial_number,
-                        vendor: found.vendor
+                        model: claimedDevice.model,
+                        make: claimedDevice.make,
+                        serialNumber: claimedDevice.serial_number,
+                        vendor: claimedDevice.vendor
                     };
                 }
             }
@@ -259,6 +273,7 @@ export default function DeviceDebugger({ tokens, initialMac = "", onMacUpdate, i
             }
 
             // Only update state if we found *something*
+            // If we have a location OR a model OR it was found in claimed list
             if (mergedDevice.model || mergedLocation || mergedDevice.createTime) {
                 setDeviceData(mergedDevice as DeviceInfo);
                 setLocationData(mergedLocation);
@@ -271,12 +286,13 @@ Device not found.
 
 Debug Info:
 - Claimed API: Success (Scanned ${claimedRes?.devices?.length || 0} recent devices)
+- First Device Keys: ${firstDeviceKeys || 'N/A'}
 - Floor API (Mac formatted): ${statusRes1?.length ? 'Match Found' : 'No Match'}
 - Floor API (Raw): ${statusRes2?.length ? 'Match Found' : 'No Match'}
 
 Tips:
-- Ensure the device is claimed or active.
-- Try checking the MAC address format.
+- The device might not be in the "recent 100" list.
+- Ensure the device is claimed.
                 `;
                 alert(debugMsg.trim());
             }
